@@ -1,13 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shooting Game</title>
+    <title>대화형 AI</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/compromise@latest"></script>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <script src="game.js"></script>
+    <div class="container">
+        <h1>대화형 AI와 대화하기</h1>
+        <div id="chatbox"></div>
+        <input type="text" id="userInput" placeholder="질문을 입력하세요...">
+        <button id="submitButton">전송</button>
+        <h2>대화 기록</h2>
+        <div id="conversationHistory"></div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
