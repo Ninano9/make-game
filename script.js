@@ -455,13 +455,13 @@ class Bullet {
     setBulletProperties() {
         switch(this.weaponType) {
             case 'SNIPER_RIFLE':
-                this.speed = GAME_CONFIG.BULLET_SPEED * 1.8; // 저격총은 더 빠름
-                this.size = GAME_CONFIG.BULLET_SIZE + 2; // 더 큰 총알
+                this.speed = GAME_CONFIG.BULLET_SPEED * 2; // 저격총은 더 빠름
+                this.size = GAME_CONFIG.BULLET_SIZE + 1.5; // 더 큰 총알
                 this.color = '#FF4444'; // 빨간색
                 break;
             case 'SHOTGUN':
                 this.speed = GAME_CONFIG.BULLET_SPEED * 0.8; // 샷건은 조금 느림
-                this.size = GAME_CONFIG.BULLET_SIZE + 1;
+                this.size = GAME_CONFIG.BULLET_SIZE + 2;
                 this.color = '#FFA500'; // 주황색
                 break;
             case 'SMG':
