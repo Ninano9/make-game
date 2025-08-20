@@ -3,18 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>대화형 AI</title>
+    <title>Battle Royale - 항공뷰 서바이벌 FPS</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/compromise@latest"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>대화형 AI와 대화하기</h1>
-        <div id="chatbox"></div>
-        <input type="text" id="userInput" placeholder="질문을 입력하세요...">
-        <button id="submitButton">전송</button>
-        <h2>대화 기록</h2>
-        <div id="conversationHistory"></div>
+    <div id="gameContainer">
+        <!-- 게임 UI -->
+        <div id="gameUI">
+            <div id="healthBar">
+                <div id="health">100</div>
+                <div id="healthFill"></div>
+            </div>
+            <div id="ammoCounter">
+                <span id="currentAmmo">30</span> / <span id="totalAmmo">120</span>
+            </div>
+            <div id="weaponInfo">
+                <span id="currentWeapon">돌격소총</span>
+            </div>
+            <div id="killCounter">킬: <span id="kills">0</span></div>
+            <div id="survivorsCounter">생존자: <span id="survivors">100</span></div>
+            <div id="experienceBar">
+                <div id="expFill"></div>
+                <div id="expText">레벨 <span id="playerLevel">1</span> - EXP: <span id="currentExp">0</span>/<span id="nextLevelExp">100</span></div>
+            </div>
+            <div id="skillPointsCounter" class="hidden">
+                스킬 포인트: <span id="skillPoints">0</span> - <button id="openSkillTree">스킬 트리 열기</button>
+            </div>
+        </div>
+
+        <!-- 미니맵 -->
+        <div id="minimap">
+            <div id="minimapPlayer"></div>
+            <div id="safezone"></div>
+        </div>
+
+        <!-- 게임 캔버스 -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- 게임 오버 화면 -->
+        <div id="gameOverScreen" class="hidden">
+            <h1>게임 오버!</h1>
+            <p>순위: <span id="finalRank"></span></p>
+            <p>킬 수: <span id="finalKills"></span></p>
+            <button id="restartBtn">다시 시작</button>
+        </div>
+
+        <!-- 스킬 트리 화면 -->
+        <div id="skillTreeScreen" class="hidden">
+            <div id="skillTreeContainer">
+                <h1>스킬 트리</h1>
+                <p>사용 가능한 스킬 포인트: <span id="availableSkillPoints">0</span></p>
+                <div id="weaponTabs">
+                    <button class="weapon-tab active" data-weapon="ASSAULT_RIFLE">돌격소총</button>
+                    <button class="weapon-tab" data-weapon="SNIPER_RIFLE">저격총</button>
+                    <button class="weapon-tab" data-weapon="SHOTGUN">샷건</button>
+                    <button class="weapon-tab" data-weapon="SMG">기관단총</button>
+                    <button class="weapon-tab" data-weapon="LMG">경기관총</button>
+                </div>
+                <div id="skillTreeContent">
+                    <!-- 동적으로 생성됨 -->
+                </div>
+                <div id="skillTreeButtons">
+                    <button id="closeSkillTree">닫기</button>
+                    <button id="switchWeapon" class="hidden">무기 변경</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 시작 화면 -->
+        <div id="startScreen">
+            <h1>Battle Royale</h1>
+            <p>항공뷰 서바이벌 FPS</p>
+            <button id="startBtn">게임 시작</button>
+            <div id="controls">
+                <h3>조작법</h3>
+                <p>이동: WASD 또는 방향키</p>
+                <p>사격: 마우스 클릭</p>
+                <p>재장전: R키</p>
+                <p>달리기: Shift키</p>
+                <p>스킬 트리: T키</p>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

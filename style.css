@@ -1,43 +1,473 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Arial', sans-serif;
-    background-color: #f4f4f4;
-    margin: 0;
-    padding: 20px;
-}
-
-.container {
-    max-width: 600px;
-    margin: auto;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
-#chatbox {
-    height: 300px;
-    overflow-y: scroll;
-    border: 1px solid #ccc;
-    margin-bottom: 10px;
-    padding: 10px;
-}
-
-#userInput {
-    width: calc(100% - 100px);
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-
-#submitButton {
-    padding: 10px;
-    border: none;
-    background: #5cb85c;
+    background: #1a1a1a;
     color: white;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameCanvas {
+    background: #2d5a27;
+    cursor: crosshair;
+    display: block;
+}
+
+/* 게임 UI */
+#gameUI {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+}
+
+#healthBar {
+    position: relative;
+    width: 200px;
+    height: 20px;
+    background: #333;
+    border: 2px solid #fff;
+    margin-bottom: 10px;
+}
+
+#healthFill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+    width: 100%;
+    transition: width 0.3s ease;
+}
+
+#health {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#ammoCounter {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#killCounter, #survivorsCounter {
+    font-size: 14px;
+    margin-bottom: 5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#weaponInfo {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #ff6b35;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#experienceBar {
+    position: relative;
+    width: 250px;
+    height: 15px;
+    background: #333;
+    border: 1px solid #fff;
+    margin-bottom: 10px;
+}
+
+#expFill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#expText {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#skillPointsCounter {
+    font-size: 14px;
+    margin-bottom: 5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+#openSkillTree {
+    background: #ff6b35;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+#openSkillTree:hover {
+    background: #f7931e;
+}
+
+/* 미니맵 */
+#minimap {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 150px;
+    height: 150px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #fff;
+    z-index: 100;
+}
+
+#minimapPlayer {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #00ff00;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+#safezone {
+    position: absolute;
+    border: 2px solid #0080ff;
+    border-radius: 50%;
+    transition: all 2s ease;
+}
+
+/* 시작 화면 */
+#startScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+#startScreen h1 {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#startScreen p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+    opacity: 0.8;
+}
+
+#startBtn, #restartBtn {
+    padding: 15px 30px;
+    font-size: 18px;
+    background: linear-gradient(45deg, #ff6b35, #f7931e);
+    color: white;
+    border: none;
     border-radius: 5px;
     cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
 }
 
-#submitButton:hover {
-    background: #4cae4c;
+#startBtn:hover, #restartBtn:hover {
+    background: linear-gradient(45deg, #f7931e, #ff6b35);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255,107,53,0.4);
+}
+
+#controls {
+    margin-top: 40px;
+    text-align: center;
+    opacity: 0.7;
+}
+
+#controls h3 {
+    margin-bottom: 15px;
+    color: #ff6b35;
+}
+
+#controls p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+/* 스킬 트리 화면 */
+#skillTreeScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+}
+
+#skillTreeContainer {
+    background: #2a2a2a;
+    border: 2px solid #ff6b35;
+    border-radius: 10px;
+    padding: 30px;
+    max-width: 800px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+#skillTreeContainer h1 {
+    color: #ff6b35;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 2rem;
+}
+
+#weaponTabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.weapon-tab {
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    padding: 10px 15px;
+    margin: 0 5px 5px 0;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.weapon-tab:hover {
+    background: #555;
+}
+
+.weapon-tab.active {
+    background: #ff6b35;
+    border-color: #ff6b35;
+}
+
+.weapon-tab.locked {
+    background: #222;
+    color: #666;
+    cursor: not-allowed;
+}
+
+#skillTreeContent {
+    margin-bottom: 20px;
+}
+
+.skill-category {
+    margin-bottom: 30px;
+}
+
+.skill-category h3 {
+    color: #ff6b35;
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #666;
+}
+
+.skill-item {
+    display: flex;
+    align-items: center;
+    background: #333;
+    margin-bottom: 10px;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #555;
+    transition: all 0.3s ease;
+}
+
+.skill-item:hover {
+    background: #3a3a3a;
+}
+
+.skill-item.available {
+    border-color: #4CAF50;
+}
+
+.skill-item.purchased {
+    background: #1a4d1a;
+    border-color: #4CAF50;
+}
+
+.skill-item.locked {
+    background: #222;
+    border-color: #333;
+    opacity: 0.6;
+}
+
+.skill-info {
+    flex: 1;
+}
+
+.skill-name {
+    font-weight: bold;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.skill-description {
+    color: #ccc;
+    font-size: 14px;
+}
+
+.skill-button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.skill-button:hover {
+    background: #45a049;
+}
+
+.skill-button:disabled {
+    background: #666;
+    cursor: not-allowed;
+}
+
+.skill-button.purchased {
+    background: #ff6b35;
+    cursor: default;
+}
+
+#skillTreeButtons {
+    display: flex;
+    justify-content: space-between;
+}
+
+#closeSkillTree, #switchWeapon {
+    background: #666;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#closeSkillTree:hover, #switchWeapon:hover {
+    background: #777;
+}
+
+#switchWeapon {
+    background: #ff6b35;
+}
+
+#switchWeapon:hover {
+    background: #f7931e;
+}
+
+/* 게임 오버 화면 */
+#gameOverScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+#gameOverScreen h1 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+    color: #ff4444;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+#gameOverScreen p {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 파티클 효과를 위한 클래스 */
+.particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.blood-particle {
+    background: #ff0000;
+}
+
+.muzzle-flash {
+    background: #ffff00;
+    box-shadow: 0 0 10px #ffff00;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    #gameUI {
+        top: 10px;
+        left: 10px;
+    }
+    
+    #minimap {
+        width: 100px;
+        height: 100px;
+        top: 10px;
+        right: 10px;
+    }
+    
+    #startScreen h1 {
+        font-size: 2rem;
+    }
+    
+    #healthBar {
+        width: 150px;
+    }
 }
