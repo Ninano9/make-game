@@ -20,6 +20,13 @@
             <div id="weaponInfo">
                 <span id="currentWeapon">돌격소총</span>
             </div>
+            <div id="reloadBar" class="hidden">
+                <div id="reloadFill"></div>
+                <div id="reloadText">장전중...</div>
+            </div>
+            <div id="skillCooldown" class="hidden">
+                <div id="cooldownText">스킬 쿨다운: <span id="cooldownTime">0</span>초</div>
+            </div>
             <div id="killCounter">킬: <span id="kills">0</span></div>
             <div id="survivorsCounter">생존자: <span id="survivors">100</span></div>
             <div id="experienceBar">
@@ -43,7 +50,6 @@
         <!-- 게임 오버 화면 -->
         <div id="gameOverScreen" class="hidden">
             <h1>게임 오버!</h1>
-            <p>순위: <span id="finalRank"></span></p>
             <p>킬 수: <span id="finalKills"></span></p>
             <button id="restartBtn">다시 시작</button>
         </div>
@@ -58,6 +64,7 @@
                      <button class="weapon-tab" data-weapon="FIRE">🔥 불 마법</button>
                      <button class="weapon-tab" data-weapon="ICE">❄️ 얼음 마법</button>
                      <button class="weapon-tab" data-weapon="LIGHTNING">⚡ 번개 마법</button>
+                     <button class="weapon-tab" data-weapon="DARK">🌑 암흑 마법</button>
                  </div>
                 <div id="skillTreeContent">
                     <!-- 동적으로 생성됨 -->

@@ -22,6 +22,10 @@ let player;
 let enemies = [];
 let bullets = [];
 let particles = [];
+let darkOrbs = [];
+let darkVoids = [];
+let fireballProjectiles = [];
+let explosionRings = [];
 let camera = { x: 0, y: 0 };
 let keys = {};
 let mouse = { x: 0, y: 0, down: false };
@@ -102,7 +106,7 @@ const MAGIC_TYPES = {
         maxAmmo: 25,
         reloadTime: 2000,
         accuracy: 0.90,
-        range: 180,
+        range: 270, // 1.5배 증가
         element: 'fire'
     },
     ICE: {
@@ -112,7 +116,7 @@ const MAGIC_TYPES = {
         maxAmmo: 20,
         reloadTime: 2200,
         accuracy: 0.95,
-        range: 200,
+        range: 300, // 1.5배 증가
         element: 'ice'
     },
     LIGHTNING: {
@@ -122,8 +126,18 @@ const MAGIC_TYPES = {
         maxAmmo: 15,
         reloadTime: 2500,
         accuracy: 0.85,
-        range: 220,
+        range: 330, // 1.5배 증가
         element: 'lightning'
+    },
+    DARK: {
+        name: '암흑 마법',
+        damage: 28,
+        fireRate: 350,
+        maxAmmo: 12,
+        reloadTime: 2800,
+        accuracy: 0.88,
+        range: 280,
+        element: 'dark'
     }
 };
 
@@ -146,7 +160,12 @@ const SKILL_TREE = {
             { name: '강화된 화염', description: '데미지 +40%', stat: 'damage', value: 0.4 },
             { name: '빠른 시전', description: '시전속도 +30%', stat: 'fireRate', value: -0.3 },
             { name: '파이어볼', description: 'E키로 광역 파이어볼 사용 가능', stat: 'special', value: 'fireball' },
-            { name: '지속 화상', description: '화상 데미지 +100%', stat: 'burnDamage', value: 1.0 }
+            { name: '지속 화상', description: '화상 데미지 +100%', stat: 'burnDamage', value: 1.0 },
+            { name: '불의 관통', description: '총알이 적을 관통', stat: 'penetration', value: 1 },
+            { name: '화염 폭발', description: '적 처치 시 주변에 폭발', stat: 'fireExplosion', value: true },
+            { name: '불타는 대지', description: '총알이 바닥에 화염 지대 생성', stat: 'fireGround', value: true },
+            { name: '지옥불', description: '화상 데미지가 주변 적에게 전파', stat: 'burnSpread', value: true },
+            { name: '🔥 인페르노', description: 'Q키로 거대한 화염 폭풍 소환', stat: 'ultimate', value: 'inferno' }
         ]
     },
     // 얼음 마법 스킬
@@ -166,7 +185,21 @@ const SKILL_TREE = {
             { name: '연쇄 번개', description: '연쇄 범위 +50%', stat: 'chainRange', value: 0.5 },
             { name: '고전압', description: '데미지 +45%', stat: 'damage', value: 0.45 },
             { name: '천둥폭풍', description: 'E키로 모든 적에게 피해', stat: 'special', value: 'thunderstorm' },
-            { name: '번개 속도', description: '총알 속도 +80%', stat: 'bulletSpeed', value: 0.8 }
+            { name: '번개 속도', description: '총알 속도 +80%', stat: 'bulletSpeed', value: 0.8 },
+            { name: '전기 충격', description: '연쇄 데미지 +20%', stat: 'chainDamage', value: 0.2 },
+            { name: '광속 이동', description: '이동속도 +25%', stat: 'speed', value: 0.25 }
+        ]
+    },
+    // 암흑 마법 스킬
+    DARK: {
+        base: { name: '암흑 마법 마스터', description: '암흑 마법 해제', magicType: 'DARK' },
+        upgrades: [
+            { name: '어둠의 인력', description: '끌어당기는 힘 +50%', stat: 'pullForce', value: 0.5 },
+            { name: '공허의 데미지', description: '데미지 +40%', stat: 'damage', value: 0.4 },
+            { name: '암흑 영역', description: 'E키로 5개의 암흑 동그라미 생성', stat: 'special', value: 'darkvoid' },
+            { name: '영혼 흡수', description: '적 처치 시 체력 +10 회복', stat: 'lifesteal', value: 10 },
+            { name: '그림자 속도', description: '시전속도 +35%', stat: 'fireRate', value: -0.35 },
+            { name: '절망의 오라', description: '암흑 영역 지속시간 +2초', stat: 'voidDuration', value: 2 }
         ]
     }
 };
@@ -179,7 +212,8 @@ let playerSkills = {
         STATS: 0,
         FIRE: 0,
         ICE: 0,
-        LIGHTNING: 0
+        LIGHTNING: 0,
+        DARK: 0
     },
     // 플레이어 능력치
     stats: {
@@ -190,13 +224,18 @@ let playerSkills = {
         burnDamage: 1,
         slowEffect: 1,
         chainRange: 1,
-        bulletSpeedBonus: 0
+        bulletSpeedBonus: 0,
+        chainDamage: 0,
+        pullForce: 1,
+        lifesteal: 0,
+        voidDuration: 0
     },
     // 특수 스킬들
     specialSkills: {
         fireball: false,
         blizzard: false,
-        thunderstorm: false
+        thunderstorm: false,
+        darkvoid: false
     }
 };
 
@@ -211,7 +250,7 @@ class Player {
         this.angle = 0;
         this.isRunning = false;
         this.lastSpecialSkill = 0;
-        this.specialSkillCooldown = 5000; // 5초 쿨다운
+        this.specialSkillCooldown = 10000; // 10초 쿨다운
         this.lastHealthRegen = 0;
         
         // 기본 무기 설정 (마법이 없을 때)
@@ -222,7 +261,7 @@ class Player {
             maxAmmo: 30,
             reloadTime: 2000,
             accuracy: 0.9,
-            range: 180,
+            range: 270, // 1.5배 증가
             ammo: 30,
             totalAmmo: 120,
             lastReload: 0,
@@ -276,7 +315,7 @@ class Player {
                 } else if (upgrade.stat === 'burnDamage' || upgrade.stat === 'slowEffect' || 
                           upgrade.stat === 'chainRange' || upgrade.stat === 'bulletSpeed') {
                     playerSkills.stats[upgrade.stat] += upgrade.value;
-                } else {
+    } else {
                     this.weapon[upgrade.stat] *= (1 + upgrade.value);
                 }
             }
@@ -370,10 +409,146 @@ class Player {
 
         if (playerSkills.specialSkills.fireball && playerSkills.currentMagic === 'FIRE') {
             this.castFireball();
+            this.lastSpecialSkill = Date.now();
         } else if (playerSkills.specialSkills.blizzard && playerSkills.currentMagic === 'ICE') {
             this.castBlizzard();
+            this.lastSpecialSkill = Date.now();
         } else if (playerSkills.specialSkills.thunderstorm && playerSkills.currentMagic === 'LIGHTNING') {
             this.castThunderstorm();
+            this.lastSpecialSkill = Date.now();
+        } else if (playerSkills.specialSkills.darkvoid && playerSkills.currentMagic === 'DARK') {
+            this.castDarkVoid();
+            this.lastSpecialSkill = Date.now();
+        }
+    }
+    
+    // 🔥 파이어볼 시전 (더 화려하게!)
+    castFireball() {
+        // 5개의 파이어볼을 부채꼴로 발사
+        for (let i = 0; i < 5; i++) {
+            const spreadAngle = (i - 2) * 0.3; // -0.6 ~ 0.6 라디안 스프레드
+            const fireball = new FireballProjectile(
+                this.x + Math.cos(this.angle + spreadAngle) * 30,
+                this.y + Math.sin(this.angle + spreadAngle) * 30,
+                this.angle + spreadAngle
+            );
+            fireballProjectiles.push(fireball);
+        }
+        
+        // 시전 이펙트
+        for (let i = 0; i < 20; i++) {
+            particles.push(new Particle(
+                this.x + (Math.random() - 0.5) * 40,
+                this.y + (Math.random() - 0.5) * 40,
+                ['#FF4500', '#FF6347', '#FFD700'][Math.floor(Math.random() * 3)],
+                Math.random() * 8 + 4,
+                {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                }
+            ));
+        }
+    }
+    
+    // ❄️ 블리자드 시전 (더 화려하게!)
+    castBlizzard() {
+        // 모든 적들을 얼리고 화면 전체에 눈보라 이펙트
+        enemies.forEach(enemy => {
+            enemy.slowDuration = Date.now() + 5000; // 5초간 빙결
+            enemy.slowEffect = 0.2; // 80% 속도 감소
+            
+            // 각 적 주위에 얼음 파티클
+            for (let i = 0; i < 15; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 60,
+                    enemy.y + (Math.random() - 0.5) * 60,
+                    ['#87CEEB', '#B0E0E6', '#E0FFFF'][Math.floor(Math.random() * 3)],
+                    Math.random() * 6 + 3,
+                    {
+                        x: (Math.random() - 0.5) * 3,
+                        y: (Math.random() - 0.5) * 3
+                    }
+                ));
+            }
+        });
+        
+        // 화면 전체 눈보라 효과
+        for (let i = 0; i < 200; i++) {
+            particles.push(new Particle(
+                camera.x + Math.random() * GAME_CONFIG.CANVAS_WIDTH,
+                camera.y + Math.random() * GAME_CONFIG.CANVAS_HEIGHT,
+                ['#FFFFFF', '#E6F3FF', '#CCE7FF'][Math.floor(Math.random() * 3)],
+                Math.random() * 4 + 2,
+                {
+                    x: (Math.random() - 0.5) * 6,
+                    y: Math.random() * 4 + 2
+                }
+            ));
+        }
+    }
+    
+    // ⚡ 천둥폭풍 시전 (더 화려하게!)
+    castThunderstorm() {
+        // 모든 적에게 번개 효과와 20% 데미지
+        enemies.forEach(enemy => {
+            enemy.takeDamage(Math.floor(enemy.maxHealth * 0.2));
+            
+            // 각 적에게 번개 이펙트
+            for (let i = 0; i < 10; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 50,
+                    enemy.y + (Math.random() - 0.5) * 50,
+                    ['#FFD700', '#FFFF00', '#FFF8DC'][Math.floor(Math.random() * 3)],
+                    Math.random() * 8 + 4,
+                    {
+                        x: (Math.random() - 0.5) * 10,
+                        y: (Math.random() - 0.5) * 10
+                    }
+                ));
+            }
+        });
+        
+        // 하늘에서 내리치는 번개 효과
+        for (let i = 0; i < 30; i++) {
+            const x = camera.x + Math.random() * GAME_CONFIG.CANVAS_WIDTH;
+            const y = camera.y + Math.random() * GAME_CONFIG.CANVAS_HEIGHT;
+            
+            particles.push(new Particle(
+                x, y,
+                '#FFFF00',
+                Math.random() * 12 + 8,
+                {
+                    x: (Math.random() - 0.5) * 4,
+                    y: Math.random() * 8 + 4
+                }
+            ));
+        }
+    }
+    
+    // 🌑 암흑 영역 시전 (새로운 스킬!)
+    castDarkVoid() {
+        // 플레이어 주변 5개 위치에 암흑 영역 생성
+        const radius = 150;
+        for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2;
+            const voidX = this.x + Math.cos(angle) * radius;
+            const voidY = this.y + Math.sin(angle) * radius;
+            
+            darkVoids.push(new DarkVoid(voidX, voidY, 3 + playerSkills.stats.voidDuration));
+        }
+        
+        // 시전 이펙트
+        for (let i = 0; i < 50; i++) {
+            particles.push(new Particle(
+                this.x + (Math.random() - 0.5) * 80,
+                this.y + (Math.random() - 0.5) * 80,
+                ['#8A2BE2', '#4B0082', '#000000'][Math.floor(Math.random() * 3)],
+                Math.random() * 10 + 5,
+                {
+                    x: (Math.random() - 0.5) * 6,
+                    y: (Math.random() - 0.5) * 6
+                }
+            ));
         }
     }
 
@@ -480,6 +655,40 @@ class Player {
         this.drawWeapon();
 
         ctx.restore();
+        
+        // 장전 중일 때 캐릭터 위에 로딩 바 표시
+        if (this.weapon.isReloading) {
+            this.drawReloadBar();
+        }
+    }
+    
+    // 캐릭터 위 장전 바 그리기
+    drawReloadBar() {
+        const barWidth = 40;
+        const barHeight = 6;
+        const barX = this.x - camera.x - barWidth / 2;
+        const barY = this.y - camera.y - this.size - 15;
+        
+        const reloadProgress = Math.min(1, (Date.now() - this.weapon.lastReload) / this.weapon.reloadTime);
+        
+        // 배경
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        // 진행 바
+        ctx.fillStyle = '#FFA500';
+        ctx.fillRect(barX, barY, barWidth * reloadProgress, barHeight);
+        
+        // 테두리
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        
+        // 텍스트
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('장전중', this.x - camera.x, barY - 3);
     }
 
     drawWeapon() {
@@ -539,6 +748,14 @@ class Enemy {
                 this.lastBurnTick = Date.now();
             }
         }
+        
+        // 암흑 데미지 처리
+        if (this.darkDamage && Date.now() < this.darkDamage) {
+            if (!this.lastDarkTick || Date.now() - this.lastDarkTick > 1000) {
+                this.takeDamage(this.darkDamageAmount || 3);
+                this.lastDarkTick = Date.now();
+            }
+        }
 
         // 이동속도에 빙결 효과 적용
         let speedMultiplier = 1;
@@ -585,7 +802,7 @@ class Enemy {
             this.y + Math.sin(this.angle) * this.size,
             this.angle,
             'enemy',
-            25,
+            12.5, // 데미지 절반으로 감소
             150,
             'ASSAULT_RIFLE'
         ));
@@ -655,7 +872,11 @@ class Bullet {
                 this.element = 'lightning';
                 break;
             default: // 기본 무기
-                this.speed = GAME_CONFIG.BULLET_SPEED * speedMultiplier;
+                if (this.owner === 'enemy') {
+                    this.speed = GAME_CONFIG.BULLET_SPEED * 0.8; // 적 총알은 20% 느리게
+                } else {
+                    this.speed = GAME_CONFIG.BULLET_SPEED * speedMultiplier;
+                }
                 this.size = GAME_CONFIG.BULLET_SIZE;
                 this.color = this.owner === 'player' ? '#FFFFFF' : '#FF6666'; // 플레이어는 흰색, 적은 연한 빨간색
                 this.element = 'basic';
@@ -699,6 +920,266 @@ class Bullet {
                 this.size
             );
         }
+    }
+}
+
+// 암흑 오브 클래스 (검은 점)
+class DarkOrb {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 8;
+        this.life = 0.8; // 0.8초
+        this.maxLife = 0.8;
+        this.createdAt = Date.now();
+        this.pulseSpeed = 5;
+        this.alpha = 1;
+    }
+    
+    update() {
+        const elapsed = (Date.now() - this.createdAt) / 1000;
+        this.life = this.maxLife - elapsed;
+        this.alpha = Math.max(0, this.life / this.maxLife);
+        return this.life <= 0;
+    }
+    
+    draw() {
+        const pulse = Math.sin(Date.now() * this.pulseSpeed / 1000) * 0.3 + 0.7;
+        const currentSize = this.size * pulse;
+        
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        
+        // 외부 어두운 원
+        ctx.fillStyle = '#1a0d1a';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize + 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 내부 검은 원
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 보라색 점
+        ctx.fillStyle = '#8A2BE2';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+// 암흑 영역 클래스 (5개의 동그라미)
+class DarkVoid {
+    constructor(x, y, duration) {
+        this.x = x;
+        this.y = y;
+        this.duration = duration;
+        this.maxDuration = duration;
+        this.createdAt = Date.now();
+        this.radius = 60;
+        this.damageInterval = 1000; // 1초마다 데미지
+        this.lastDamage = 0;
+    }
+    
+    update() {
+        const elapsed = (Date.now() - this.createdAt) / 1000;
+        this.duration = this.maxDuration - elapsed;
+        
+        // 영역 안의 적들에게 데미지
+        if (Date.now() - this.lastDamage > this.damageInterval) {
+            enemies.forEach(enemy => {
+                const dx = enemy.x - this.x;
+                const dy = enemy.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < this.radius) {
+                    enemy.takeDamage(15);
+                    
+                    // 암흑 파티클 효과
+                    for (let i = 0; i < 5; i++) {
+                        particles.push(new Particle(
+                            enemy.x + (Math.random() - 0.5) * 20,
+                            enemy.y + (Math.random() - 0.5) * 20,
+                            '#8A2BE2',
+                            Math.random() * 4 + 2,
+                            {
+                                x: (Math.random() - 0.5) * 3,
+                                y: (Math.random() - 0.5) * 3
+                            }
+                        ));
+                    }
+                }
+            });
+            this.lastDamage = Date.now();
+        }
+        
+        return this.duration <= 0;
+    }
+    
+    draw() {
+        const alpha = Math.max(0, this.duration / this.maxDuration);
+        const pulse = Math.sin(Date.now() * 0.005) * 0.2 + 0.8;
+        
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.6;
+        
+        // 외부 어두운 원
+        ctx.fillStyle = '#1a0d1a';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 내부 보라색 원
+        ctx.fillStyle = '#4B0082';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius * pulse * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 암흑 원
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius * pulse * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 가장자리 효과
+        ctx.strokeStyle = '#8A2BE2';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+}
+
+// 파이어볼 투사체 클래스
+class FireballProjectile {
+    constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.speed = 8;
+        this.size = 15;
+        this.life = 200; // 이동 거리
+        this.exploded = false;
+    }
+    
+    update() {
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        this.life--;
+        
+        // 적과 충돌 확인
+        for (let enemy of enemies) {
+            const dx = this.x - enemy.x;
+            const dy = this.y - enemy.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < this.size + enemy.size) {
+                this.explode();
+                return true;
+            }
+        }
+        
+        if (this.life <= 0) {
+            this.explode();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    explode() {
+        if (this.exploded) return;
+        this.exploded = true;
+        
+        // 폭발 링 생성
+        explosionRings.push(new ExplosionRing(this.x, this.y, 80));
+        
+        // 범위 내 적들에게 데미지와 화상 효과
+        enemies.forEach(enemy => {
+            const dx = enemy.x - this.x;
+            const dy = enemy.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < 80) {
+                enemy.takeDamage(50);
+                enemy.burnDuration = Date.now() + 4000; // 4초간 화상
+                enemy.burnDamage = 8;
+            }
+        });
+        
+        // 폭발 파티클
+        for (let i = 0; i < 30; i++) {
+            particles.push(new Particle(
+                this.x + (Math.random() - 0.5) * 60,
+                this.y + (Math.random() - 0.5) * 60,
+                ['#FF4500', '#FF6347', '#FFD700', '#FF8C00'][Math.floor(Math.random() * 4)],
+                Math.random() * 12 + 6,
+                {
+                    x: (Math.random() - 0.5) * 15,
+                    y: (Math.random() - 0.5) * 15
+                }
+            ));
+        }
+    }
+    
+    draw() {
+        // 파이어볼 그리기
+        ctx.save();
+        
+        // 외부 불꽃
+        ctx.fillStyle = '#FF4500';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 내부 불꽃
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 밝은 점
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+// 폭발 링 클래스
+class ExplosionRing {
+    constructor(x, y, maxRadius) {
+        this.x = x;
+        this.y = y;
+        this.radius = 0;
+        this.maxRadius = maxRadius;
+        this.life = 1.0;
+        this.decay = 0.05;
+    }
+    
+    update() {
+        this.radius += (this.maxRadius - this.radius) * 0.3;
+        this.life -= this.decay;
+        return this.life <= 0;
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.strokeStyle = '#FF4500';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
     }
 }
 
@@ -1130,8 +1611,21 @@ function setupEventListeners() {
     });
 
     // 게임 버튼들
-    document.getElementById('startBtn').addEventListener('click', startGame);
-    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    
+    console.log('시작 버튼 요소:', startBtn);
+    
+    if (startBtn) {
+        startBtn.addEventListener('click', startGame);
+        console.log('시작 버튼 이벤트 리스너 등록됨');
+    } else {
+        console.error('시작 버튼을 찾을 수 없습니다!');
+    }
+    
+    if (restartBtn) {
+        restartBtn.addEventListener('click', restartGame);
+    }
     
     // 스킬 트리 버튼들
     document.getElementById('openSkillTree').addEventListener('click', openSkillTree);
@@ -1151,6 +1645,7 @@ function setupEventListeners() {
 }
 
 function startGame() {
+    console.log('게임 시작 버튼 클릭됨');
     gameState = 'playing';
     document.getElementById('startScreen').classList.add('hidden');
     gameLoop();
@@ -1164,6 +1659,48 @@ function restartGame() {
     gameTime = 0;
     bullets = [];
     particles = [];
+    darkOrbs = [];
+    darkVoids = [];
+    fireballProjectiles = [];
+    explosionRings = [];
+    
+    // 스킬 초기화
+    playerSkills = {
+        unlockedMagic: [],
+        currentMagic: null,
+        skillUpgrades: {
+            STATS: 0,
+            FIRE: 0,
+            ICE: 0,
+            LIGHTNING: 0,
+            DARK: 0
+        },
+        stats: {
+            healthRegen: 0,
+            maxHealthBonus: 0,
+            speedBonus: 0,
+            totalAmmoBonus: 0,
+            burnDamage: 1,
+            slowEffect: 1,
+            chainRange: 1,
+            bulletSpeedBonus: 0,
+            chainDamage: 0,
+            pullForce: 1,
+            lifesteal: 0,
+            voidDuration: 0
+        },
+        specialSkills: {
+            fireball: false,
+            blizzard: false,
+            thunderstorm: false,
+            darkvoid: false
+        }
+    };
+    
+    // 경험치와 레벨 초기화
+    experience = 0;
+    level = 1;
+    skillPoints = 0;
     
     player = new Player(GAME_CONFIG.MAP_SIZE / 2, GAME_CONFIG.MAP_SIZE / 2);
     
@@ -1250,7 +1787,9 @@ function update() {
                     createBloodSplatter(enemy.x, enemy.y);
                     
                     // 마법 효과 적용
-                    applyMagicEffect(bullet, enemy);
+                    if (bullet.element) {
+                        applyMagicEffect(bullet, enemy);
+                    }
                     
                     if (enemy.takeDamage(bullet.damage)) {
                         enemies.splice(j, 1);
@@ -1271,6 +1810,34 @@ function update() {
             particles.splice(i, 1);
         }
     }
+    
+    // DarkOrb 업데이트
+    for (let i = darkOrbs.length - 1; i >= 0; i--) {
+        if (darkOrbs[i].update()) {
+            darkOrbs.splice(i, 1);
+        }
+    }
+    
+    // DarkVoid 업데이트
+    for (let i = darkVoids.length - 1; i >= 0; i--) {
+        if (darkVoids[i].update()) {
+            darkVoids.splice(i, 1);
+        }
+    }
+    
+    // FireballProjectile 업데이트
+    for (let i = fireballProjectiles.length - 1; i >= 0; i--) {
+        if (fireballProjectiles[i].update()) {
+            fireballProjectiles.splice(i, 1);
+        }
+    }
+    
+    // ExplosionRing 업데이트
+    for (let i = explosionRings.length - 1; i >= 0; i--) {
+        if (explosionRings[i].update()) {
+            explosionRings.splice(i, 1);
+        }
+    }
 
     if (enemies.length === 0) {
         gameState = 'gameOver';
@@ -1279,14 +1846,73 @@ function update() {
     updateUI();
 }
 
+// 마법 효과 적용 함수
+function applyMagicEffect(bullet, enemy) {
+    switch(bullet.element) {
+        case 'fire':
+            // 화상 효과
+            enemy.burnDuration = Date.now() + 3000; // 3초간 화상
+            enemy.burnDamage = Math.floor(bullet.damage * 0.2 * playerSkills.stats.burnDamage);
+            break;
+            
+        case 'ice':
+            // 빙결 효과
+            enemy.slowDuration = Date.now() + 2000; // 2초간 빙결
+            enemy.slowEffect = 0.5 * playerSkills.stats.slowEffect; // 50% 속도 감소
+            break;
+            
+        case 'lightning':
+            // 번개 연쇄 효과
+            chainLightning(enemy.x, enemy.y, bullet.damage * (0.3 + playerSkills.stats.chainDamage));
+            break;
+            
+        case 'dark':
+            // 암흑 오브 생성
+            darkOrbs.push(new DarkOrb(enemy.x, enemy.y));
+            
+            // 끌어당기기 효과 (0.5 네모칸 = 약 25px)
+            const pullRange = 25 * playerSkills.stats.pullForce;
+            enemies.forEach(nearbyEnemy => {
+                if (nearbyEnemy !== enemy) {
+                    const dx = nearbyEnemy.x - enemy.x;
+                    const dy = nearbyEnemy.y - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < pullRange && distance > 0) {
+                        // 끌어당기는 힘 적용
+                        const pullStrength = 2 * playerSkills.stats.pullForce;
+                        nearbyEnemy.x -= (dx / distance) * pullStrength;
+                        nearbyEnemy.y -= (dy / distance) * pullStrength;
+                        
+                        // 끌려온 적에게 초당 데미지
+                        nearbyEnemy.darkDamage = Date.now() + 500; // 0.5초간 지속
+                        nearbyEnemy.darkDamageAmount = Math.floor(bullet.damage * 0.1);
+                    }
+                }
+            });
+            break;
+    }
+}
+
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap();
-    drawSafezone();
+    // drawSafezone(); // 세이프존 원 제거
+    
+    // 배경 효과들 먼저 그리기
+    darkVoids.forEach(void_ => void_.draw());
+    explosionRings.forEach(ring => ring.draw());
+    
+    // 게임 오브젝트들
     enemies.forEach(enemy => enemy.draw());
     player.draw();
     bullets.forEach(bullet => bullet.draw());
+    fireballProjectiles.forEach(fireball => fireball.draw());
+    
+    // 전경 효과들
     particles.forEach(particle => particle.draw());
+    darkOrbs.forEach(orb => orb.draw());
+    
     updateMinimap();
 }
 
@@ -1341,9 +1967,11 @@ function updateUI() {
 
     // 경험치 UI 업데이트
     updateExpUI();
+    
+    // 스킬 쿨다운 UI 업데이트
+    updateSkillCooldownUI();
 
     if (gameState === 'gameOver') {
-        document.getElementById('finalRank').textContent = survivors + 1;
         document.getElementById('finalKills').textContent = kills;
         document.getElementById('gameOverScreen').classList.remove('hidden');
     }
@@ -1378,6 +2006,26 @@ function gainExperience(amount) {
     }
     
     updateExpUI();
+}
+
+// 스킬 쿨다운 UI 업데이트
+function updateSkillCooldownUI() {
+    const cooldownElement = document.getElementById('skillCooldown');
+    const cooldownTimeElement = document.getElementById('cooldownTime');
+    
+    if (player && player.lastSpecialSkill) {
+        const timeSinceSkill = Date.now() - player.lastSpecialSkill;
+        const remainingCooldown = Math.max(0, player.specialSkillCooldown - timeSinceSkill);
+        
+        if (remainingCooldown > 0) {
+            cooldownElement.classList.remove('hidden');
+            cooldownTimeElement.textContent = Math.ceil(remainingCooldown / 1000);
+        } else {
+            cooldownElement.classList.add('hidden');
+        }
+    } else {
+        cooldownElement.classList.add('hidden');
+    }
 }
 
 function getExpNeededForNextLevel() {
@@ -1594,4 +2242,45 @@ function switchMagic(magicType) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', initGame);
+function initGame() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    
+    canvas.width = GAME_CONFIG.CANVAS_WIDTH;
+    canvas.height = GAME_CONFIG.CANVAS_HEIGHT;
+    
+    // 게임 초기 상태 설정
+    gameState = 'menu';
+    
+    // 플레이어 초기화
+    player = new Player(GAME_CONFIG.MAP_SIZE / 2, GAME_CONFIG.MAP_SIZE / 2);
+    
+    // 적들 초기화
+    enemies = [];
+    for (let i = 0; i < GAME_CONFIG.INITIAL_ENEMIES; i++) {
+        let x, y;
+        do {
+            x = Math.random() * GAME_CONFIG.MAP_SIZE;
+            y = Math.random() * GAME_CONFIG.MAP_SIZE;
+        } while (Math.sqrt((x - player.x) ** 2 + (y - player.y) ** 2) < 100);
+        
+        enemies.push(new Enemy(x, y));
+    }
+    
+    survivors = GAME_CONFIG.INITIAL_ENEMIES + 1;
+    
+    safezone = {
+        x: GAME_CONFIG.MAP_SIZE / 2,
+        y: GAME_CONFIG.MAP_SIZE / 2,
+        radius: GAME_CONFIG.MAP_SIZE / 2,
+        targetRadius: GAME_CONFIG.MAP_SIZE / 2
+    };
+    
+    setupEventListeners();
+}
+
+console.log('스크립트 파일 로드됨');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 로드 완료');
+    initGame();
+});
