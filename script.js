@@ -397,16 +397,37 @@ class Player {
             enemy.slowDuration = Date.now() + 5000; // 5초간 지속
         });
         
-        // 블리자드 파티클 효과
-        for (let i = 0; i < 50; i++) {
+        // 블리자드 파티클 효과 (화면 전체)
+        for (let i = 0; i < 100; i++) {
             particles.push(new Particle(
-                Math.random() * GAME_CONFIG.MAP_SIZE,
-                Math.random() * GAME_CONFIG.MAP_SIZE,
-                '#87CEEB',
-                Math.random() * 3 + 1,
-                { x: 0, y: Math.random() * 2 + 1 }
+                camera.x + Math.random() * GAME_CONFIG.CANVAS_WIDTH,
+                camera.y + Math.random() * GAME_CONFIG.CANVAS_HEIGHT,
+                Math.random() > 0.5 ? '#87CEEB' : '#FFFFFF',
+                Math.random() * 4 + 2,
+                { 
+                    x: (Math.random() - 0.5) * 2, 
+                    y: Math.random() * 3 + 2 
+                }
             ));
         }
+        
+        // 빙결된 적들에게 시각 효과
+        enemies.forEach(enemy => {
+            if (enemy.slowDuration && Date.now() < enemy.slowDuration) {
+                for (let i = 0; i < 3; i++) {
+                    particles.push(new Particle(
+                        enemy.x + (Math.random() - 0.5) * 40,
+                        enemy.y + (Math.random() - 0.5) * 40,
+                        '#87CEEB',
+                        Math.random() * 3 + 1,
+                        {
+                            x: (Math.random() - 0.5) * 2,
+                            y: -(Math.random() * 2 + 1)
+                        }
+                    ));
+                }
+            }
+        });
     }
 
     castThunderstorm() {
@@ -791,7 +812,8 @@ function applyMagicEffect(bullet, enemy) {
 function chainLightning(x, y, damage) {
     let chainCount = 0;
     let maxChains = 2;
-    let chainRange = 100 * playerSkills.stats.chainRange;
+    let chainRange = 200 * playerSkills.stats.chainRange; // 범위 확대 (2x2 화면 크기)
+    let chainTargets = [];
     
     enemies.forEach(enemy => {
         if (chainCount >= maxChains) return;
@@ -799,23 +821,238 @@ function chainLightning(x, y, damage) {
         let distance = Math.sqrt((enemy.x - x) ** 2 + (enemy.y - y) ** 2);
         if (distance <= chainRange && distance > 0) {
             enemy.takeDamage(damage * 0.3); // 30% 데미지
+            chainTargets.push({x: enemy.x, y: enemy.y});
             chainCount++;
             
             // 번개 파티클 효과
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 5; i++) {
                 particles.push(new Particle(
-                    enemy.x + (Math.random() - 0.5) * 20,
-                    enemy.y + (Math.random() - 0.5) * 20,
+                    enemy.x + (Math.random() - 0.5) * 30,
+                    enemy.y + (Math.random() - 0.5) * 30,
                     '#FFD700',
-                    Math.random() * 3 + 1,
+                    Math.random() * 4 + 2,
                     {
-                        x: (Math.random() - 0.5) * 3,
-                        y: (Math.random() - 0.5) * 3
+                        x: (Math.random() - 0.5) * 4,
+                        y: (Math.random() - 0.5) * 4
                     }
                 ));
             }
         }
     });
+    
+    // 연쇄 번개 시각 효과 (노란 선)
+    if (chainTargets.length > 0) {
+        particles.push(new LightningChain(x, y, chainTargets));
+    }
+}
+
+// 번개 연쇄 시각 효과 클래스
+class LightningChain {
+    constructor(startX, startY, targets) {
+        this.startX = startX;
+        this.startY = startY;
+        this.targets = targets;
+        this.life = 1.0;
+        this.decay = 0.1; // 빠르게 사라짐
+        this.segments = [];
+        
+        // 각 타겟까지의 번개 경로 생성
+        this.targets.forEach(target => {
+            this.segments.push(this.generateLightningPath(startX, startY, target.x, target.y));
+        });
+    }
+    
+    generateLightningPath(x1, y1, x2, y2) {
+        let segments = [];
+        let steps = 8; // 번개 세그먼트 수
+        
+        for (let i = 0; i <= steps; i++) {
+            let t = i / steps;
+            let x = x1 + (x2 - x1) * t;
+            let y = y1 + (y2 - y1) * t;
+            
+            // 번개처럼 지그재그 효과
+            if (i > 0 && i < steps) {
+                x += (Math.random() - 0.5) * 20;
+                y += (Math.random() - 0.5) * 20;
+            }
+            
+            segments.push({x, y});
+        }
+        
+        return segments;
+    }
+    
+    update() {
+        this.life -= this.decay;
+        return this.life <= 0;
+    }
+    
+    draw() {
+        if (this.life <= 0) return;
+        
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 5;
+        
+        this.segments.forEach(path => {
+            ctx.beginPath();
+            for (let i = 0; i < path.length; i++) {
+                let point = path[i];
+                if (i === 0) {
+                    ctx.moveTo(point.x - camera.x, point.y - camera.y);
+                } else {
+                    ctx.lineTo(point.x - camera.x, point.y - camera.y);
+                }
+            }
+            ctx.stroke();
+        });
+        
+        ctx.restore();
+    }
+}
+
+// 파이어볼 프로젝타일 클래스
+class FireballProjectile {
+    constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.speed = 8;
+        this.size = 15;
+        this.life = 1.0;
+        this.decay = 0.01;
+        this.maxDistance = 300;
+        this.distanceTraveled = 0;
+        this.startX = x;
+        this.startY = y;
+    }
+    
+    update() {
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+        
+        this.distanceTraveled = Math.sqrt(
+            Math.pow(this.x - this.startX, 2) + Math.pow(this.y - this.startY, 2)
+        );
+        
+        this.life -= this.decay;
+        
+        // 최대 거리에 도달하거나 적과 충돌하면 폭발
+        if (this.distanceTraveled >= this.maxDistance || this.life <= 0) {
+            this.explode();
+            return true;
+        }
+        
+        // 적과 충돌 체크
+        for (let enemy of enemies) {
+            let dx = this.x - enemy.x;
+            let dy = this.y - enemy.y;
+            if (Math.sqrt(dx * dx + dy * dy) < this.size + enemy.size) {
+                this.explode();
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    explode() {
+        let explosionRadius = 100;
+        
+        // 폭발 범위 내 모든 적에게 데미지
+        enemies.forEach(enemy => {
+            let distance = Math.sqrt(
+                Math.pow(enemy.x - this.x, 2) + Math.pow(enemy.y - this.y, 2)
+            );
+            
+            if (distance <= explosionRadius) {
+                let damage = 60 * (1 - distance / explosionRadius); // 거리에 따른 데미지 감소
+                enemy.takeDamage(damage);
+                
+                // 화상 효과 적용
+                enemy.burnDamage = 8 * playerSkills.stats.burnDamage;
+                enemy.burnDuration = Date.now() + 4000; // 4초간 지속
+            }
+        });
+        
+        // 폭발 파티클 효과
+        for (let i = 0; i < 20; i++) {
+            particles.push(new Particle(
+                this.x + (Math.random() - 0.5) * explosionRadius,
+                this.y + (Math.random() - 0.5) * explosionRadius,
+                Math.random() > 0.5 ? '#FF4444' : '#FFA500',
+                Math.random() * 8 + 4,
+                {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                }
+            ));
+        }
+        
+        // 폭발 원형 효과
+        particles.push(new ExplosionRing(this.x, this.y, explosionRadius));
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        
+        // 파이어볼 본체
+        ctx.fillStyle = '#FF4444';
+        ctx.shadowColor = '#FF4444';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 내부 불꽃
+        ctx.fillStyle = '#FFA500';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+// 폭발 원형 효과 클래스
+class ExplosionRing {
+    constructor(x, y, maxRadius) {
+        this.x = x;
+        this.y = y;
+        this.radius = 0;
+        this.maxRadius = maxRadius;
+        this.life = 1.0;
+        this.decay = 0.05;
+        this.expandSpeed = 8;
+    }
+    
+    update() {
+        this.radius += this.expandSpeed;
+        this.life -= this.decay;
+        return this.life <= 0 || this.radius > this.maxRadius;
+    }
+    
+    draw() {
+        if (this.life <= 0) return;
+        
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.strokeStyle = '#FF4444';
+        ctx.lineWidth = 4;
+        ctx.shadowColor = '#FF4444';
+        ctx.shadowBlur = 8;
+        
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
 }
 
 function initGame() {
