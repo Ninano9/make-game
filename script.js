@@ -41,7 +41,8 @@ let level = 1;
 let skillPoints = 0;
 let pendingLevelUp = false;
 
-// 무기 타입 정의
+// 무기 타입 정의 (주석처리)
+/*
 const WEAPON_TYPES = {
     ASSAULT_RIFLE: {
         name: '돌격소총',
@@ -59,7 +60,7 @@ const WEAPON_TYPES = {
         maxAmmo: 5,
         reloadTime: 3000,
         accuracy: 0.99,
-        range: 400 // 사거리 늘림
+        range: 400
     },
     SHOTGUN: {
         name: '샷건',
@@ -90,66 +91,112 @@ const WEAPON_TYPES = {
         range: 250
     }
 };
+*/
 
-// 스킬 트리 정의
+// 마법 스킬 타입 정의
+const MAGIC_TYPES = {
+    FIRE: {
+        name: '불 마법',
+        damage: 30,
+        fireRate: 200,
+        maxAmmo: 25,
+        reloadTime: 2000,
+        accuracy: 0.90,
+        range: 180,
+        element: 'fire'
+    },
+    ICE: {
+        name: '얼음 마법',
+        damage: 25,
+        fireRate: 250,
+        maxAmmo: 20,
+        reloadTime: 2200,
+        accuracy: 0.95,
+        range: 200,
+        element: 'ice'
+    },
+    LIGHTNING: {
+        name: '번개 마법',
+        damage: 35,
+        fireRate: 300,
+        maxAmmo: 15,
+        reloadTime: 2500,
+        accuracy: 0.85,
+        range: 220,
+        element: 'lightning'
+    }
+};
+
+// 스킬 트리 정의 (마법 + 스탯 강화)
 const SKILL_TREE = {
-    ASSAULT_RIFLE: {
-        base: { name: '돌격소총 마스터', description: '돌격소총 해제', weaponType: 'ASSAULT_RIFLE' },
+    // 스탯 강화 스킬들
+    STATS: {
+        base: { name: '기본 능력 향상', description: '캐릭터 기본 능력 강화', category: 'stats' },
         upgrades: [
-            { name: '향상된 정확도', description: '정확도 +10%', stat: 'accuracy', value: 0.1 },
-            { name: '빠른 재장전', description: '재장전 속도 +25%', stat: 'reloadTime', value: -0.25 },
-            { name: '확장 탄창', description: '탄창 용량 +50%', stat: 'maxAmmo', value: 0.5 },
-            { name: '강화 탄환', description: '데미지 +40%', stat: 'damage', value: 0.4 }
+            { name: '체력 재생', description: '초당 체력 2 회복', stat: 'healthRegen', value: 2 },
+            { name: '최대 체력 증가', description: '최대 체력 +50', stat: 'maxHealth', value: 50 },
+            { name: '신속함', description: '이동속도 +30%', stat: 'speed', value: 0.3 },
+            { name: '탄약 확장', description: '최대 탄약 +100%', stat: 'totalAmmo', value: 1.0 }
         ]
     },
-    SNIPER_RIFLE: {
-        base: { name: '저격총 마스터', description: '저격총 해제', weaponType: 'SNIPER_RIFLE' },
+    // 불 마법 스킬
+    FIRE: {
+        base: { name: '불 마법 마스터', description: '불 마법 해제', magicType: 'FIRE' },
         upgrades: [
-            { name: '완벽한 조준', description: '정확도 +5%', stat: 'accuracy', value: 0.05 },
-            { name: '관통탄', description: '데미지 +60%', stat: 'damage', value: 0.6 },
-            { name: '빠른 볼트액션', description: '연사속도 +30%', stat: 'fireRate', value: -0.3 },
-            { name: '확장 탄창', description: '탄창 용량 +100%', stat: 'maxAmmo', value: 1.0 }
+            { name: '강화된 화염', description: '데미지 +40%', stat: 'damage', value: 0.4 },
+            { name: '빠른 시전', description: '시전속도 +30%', stat: 'fireRate', value: -0.3 },
+            { name: '파이어볼', description: 'E키로 광역 파이어볼 사용 가능', stat: 'special', value: 'fireball' },
+            { name: '지속 화상', description: '화상 데미지 +100%', stat: 'burnDamage', value: 1.0 }
         ]
     },
-    SHOTGUN: {
-        base: { name: '샷건 마스터', description: '샷건 해제', weaponType: 'SHOTGUN' },
+    // 얼음 마법 스킬
+    ICE: {
+        base: { name: '얼음 마법 마스터', description: '얼음 마법 해제', magicType: 'ICE' },
         upgrades: [
-            { name: '확산 강화', description: '펠릿 수 +40%', stat: 'pellets', value: 0.4 },
-            { name: '강화 산탄', description: '데미지 +50%', stat: 'damage', value: 0.5 },
-            { name: '빠른 펌핑', description: '연사속도 +40%', stat: 'fireRate', value: -0.4 },
-            { name: '확장 튜브', description: '탄창 용량 +75%', stat: 'maxAmmo', value: 0.75 }
+            { name: '빙결 강화', description: '빙결 효과 +50%', stat: 'slowEffect', value: 0.5 },
+            { name: '마나 효율', description: '재장전 속도 +25%', stat: 'reloadTime', value: -0.25 },
+            { name: '블리자드', description: 'E키로 전체 적 빙결', stat: 'special', value: 'blizzard' },
+            { name: '절대영도', description: '얼음 데미지 +60%', stat: 'damage', value: 0.6 }
         ]
     },
-    SMG: {
-        base: { name: '기관단총 마스터', description: '기관단총 해제', weaponType: 'SMG' },
+    // 번개 마법 스킬
+    LIGHTNING: {
+        base: { name: '번개 마법 마스터', description: '번개 마법 해제', magicType: 'LIGHTNING' },
         upgrades: [
-            { name: '고속 연사', description: '연사속도 +50%', stat: 'fireRate', value: -0.5 },
-            { name: '안정화 시스템', description: '정확도 +15%', stat: 'accuracy', value: 0.15 },
-            { name: '대용량 탄창', description: '탄창 용량 +75%', stat: 'maxAmmo', value: 0.75 },
-            { name: '고위력 탄환', description: '데미지 +55%', stat: 'damage', value: 0.55 }
-        ]
-    },
-    LMG: {
-        base: { name: '경기관총 마스터', description: '경기관총 해제', weaponType: 'LMG' },
-        upgrades: [
-            { name: '억압 사격', description: '데미지 +45%', stat: 'damage', value: 0.45 },
-            { name: '안정화 바이포드', description: '정확도 +12%', stat: 'accuracy', value: 0.12 },
-            { name: '개선된 벨트', description: '탄창 용량 +50%', stat: 'maxAmmo', value: 0.5 },
-            { name: '향상된 총열', description: '연사속도 +25%', stat: 'fireRate', value: -0.25 }
+            { name: '연쇄 번개', description: '연쇄 범위 +50%', stat: 'chainRange', value: 0.5 },
+            { name: '고전압', description: '데미지 +45%', stat: 'damage', value: 0.45 },
+            { name: '천둥폭풍', description: 'E키로 모든 적에게 피해', stat: 'special', value: 'thunderstorm' },
+            { name: '번개 속도', description: '총알 속도 +80%', stat: 'bulletSpeed', value: 0.8 }
         ]
     }
 };
 
 // 플레이어 스킬 상태
 let playerSkills = {
-    unlockedWeapons: ['ASSAULT_RIFLE'], // 기본 무기
-    currentWeapon: 'ASSAULT_RIFLE',
-    weaponUpgrades: {
-        ASSAULT_RIFLE: 0,
-        SNIPER_RIFLE: 0,
-        SHOTGUN: 0,
-        SMG: 0,
-        LMG: 0
+    unlockedMagic: [], // 해제된 마법들
+    currentMagic: null, // 현재 사용 중인 마법
+    skillUpgrades: {
+        STATS: 0,
+        FIRE: 0,
+        ICE: 0,
+        LIGHTNING: 0
+    },
+    // 플레이어 능력치
+    stats: {
+        healthRegen: 0,
+        maxHealthBonus: 0,
+        speedBonus: 0,
+        totalAmmoBonus: 0,
+        burnDamage: 1,
+        slowEffect: 1,
+        chainRange: 1,
+        bulletSpeedBonus: 0
+    },
+    // 특수 스킬들
+    specialSkills: {
+        fireball: false,
+        blizzard: false,
+        thunderstorm: false
     }
 };
 
@@ -163,55 +210,92 @@ class Player {
         this.maxHealth = 100;
         this.angle = 0;
         this.isRunning = false;
-        this.updateWeaponStats();
-    }
-
-    updateWeaponStats() {
-        let weaponType = WEAPON_TYPES[playerSkills.currentWeapon];
-        let upgradeLevel = playerSkills.weaponUpgrades[playerSkills.currentWeapon];
-        let skillData = SKILL_TREE[playerSkills.currentWeapon];
+        this.lastSpecialSkill = 0;
+        this.specialSkillCooldown = 5000; // 5초 쿨다운
+        this.lastHealthRegen = 0;
         
-        // 기본 무기 스탯
+        // 기본 무기 설정 (마법이 없을 때)
         this.weapon = {
-            type: playerSkills.currentWeapon,
-            damage: weaponType.damage,
-            fireRate: weaponType.fireRate,
-            maxAmmo: weaponType.maxAmmo,
-            reloadTime: weaponType.reloadTime,
-            accuracy: weaponType.accuracy,
-            range: weaponType.range,
-            pellets: weaponType.pellets || 1,
-            ammo: weaponType.maxAmmo,
-            totalAmmo: weaponType.maxAmmo * 4,
+            type: 'basic',
+            damage: 20,
+            fireRate: 200,
+            maxAmmo: 30,
+            reloadTime: 2000,
+            accuracy: 0.9,
+            range: 180,
+            ammo: 30,
+            totalAmmo: 120,
             lastReload: 0,
             isReloading: false,
             lastShot: 0
         };
+        
+        this.updateStats();
+    }
 
-        // 업그레이드 적용
-        for (let i = 0; i < upgradeLevel; i++) {
-            let upgrade = skillData.upgrades[i];
-            if (upgrade.stat === 'reloadTime' || upgrade.stat === 'fireRate') {
-                this.weapon[upgrade.stat] *= (1 + upgrade.value);
-            } else {
-                this.weapon[upgrade.stat] *= (1 + upgrade.value);
-            }
+    updateStats() {
+        // 스탯 강화 적용
+        let statsLevel = playerSkills.skillUpgrades.STATS;
+        
+        // 최대 체력 업데이트
+        this.maxHealth = 100 + playerSkills.stats.maxHealthBonus;
+        if (this.health > this.maxHealth) {
+            this.health = this.maxHealth;
         }
 
-        // 정수로 변환이 필요한 스탯들
-        this.weapon.maxAmmo = Math.floor(this.weapon.maxAmmo);
-        this.weapon.damage = Math.floor(this.weapon.damage);
-        this.weapon.reloadTime = Math.floor(this.weapon.reloadTime);
-        this.weapon.fireRate = Math.floor(this.weapon.fireRate);
-        this.weapon.pellets = Math.floor(this.weapon.pellets);
-        
-        // 현재 탄약 조정
-        this.weapon.ammo = Math.min(this.weapon.ammo, this.weapon.maxAmmo);
-        this.weapon.totalAmmo = this.weapon.maxAmmo * 4;
+        // 현재 마법이 있으면 마법 스탯 적용
+        if (playerSkills.currentMagic) {
+            let magicType = MAGIC_TYPES[playerSkills.currentMagic];
+            let upgradeLevel = playerSkills.skillUpgrades[playerSkills.currentMagic];
+            let skillData = SKILL_TREE[playerSkills.currentMagic];
+            
+            // 기본 마법 스탯
+            this.weapon = {
+                type: playerSkills.currentMagic,
+                damage: magicType.damage,
+                fireRate: magicType.fireRate,
+                maxAmmo: magicType.maxAmmo,
+                reloadTime: magicType.reloadTime,
+                accuracy: magicType.accuracy,
+                range: magicType.range,
+                element: magicType.element,
+                ammo: this.weapon.ammo || magicType.maxAmmo,
+                totalAmmo: Math.floor(magicType.maxAmmo * 4 * (1 + playerSkills.stats.totalAmmoBonus)),
+                lastReload: this.weapon.lastReload || 0,
+                isReloading: this.weapon.isReloading || false,
+                lastShot: this.weapon.lastShot || 0
+            };
+
+            // 업그레이드 적용
+            for (let i = 0; i < upgradeLevel; i++) {
+                let upgrade = skillData.upgrades[i];
+                if (upgrade.stat === 'reloadTime' || upgrade.stat === 'fireRate') {
+                    this.weapon[upgrade.stat] *= (1 + upgrade.value);
+                } else if (upgrade.stat === 'special') {
+                    playerSkills.specialSkills[upgrade.value] = true;
+                } else if (upgrade.stat === 'burnDamage' || upgrade.stat === 'slowEffect' || 
+                          upgrade.stat === 'chainRange' || upgrade.stat === 'bulletSpeed') {
+                    playerSkills.stats[upgrade.stat] += upgrade.value;
+                } else {
+                    this.weapon[upgrade.stat] *= (1 + upgrade.value);
+                }
+            }
+
+            // 정수로 변환
+            this.weapon.maxAmmo = Math.floor(this.weapon.maxAmmo);
+            this.weapon.damage = Math.floor(this.weapon.damage);
+            this.weapon.reloadTime = Math.floor(this.weapon.reloadTime);
+            this.weapon.fireRate = Math.floor(this.weapon.fireRate);
+            
+            // 현재 탄약 조정
+            this.weapon.ammo = Math.min(this.weapon.ammo, this.weapon.maxAmmo);
+        }
     }
 
     update() {
-        let speed = this.isRunning ? GAME_CONFIG.PLAYER_RUN_SPEED : GAME_CONFIG.PLAYER_SPEED;
+        // 이동속도에 스탯 보너스 적용
+        let baseSpeed = this.isRunning ? GAME_CONFIG.PLAYER_RUN_SPEED : GAME_CONFIG.PLAYER_SPEED;
+        let speed = baseSpeed * (1 + playerSkills.stats.speedBonus);
         let dx = 0, dy = 0;
 
         if (keys['w'] || keys['ArrowUp']) dy -= speed;
@@ -229,6 +313,12 @@ class Player {
 
         this.angle = Math.atan2(mouse.y + camera.y - this.y, mouse.x + camera.x - this.x);
 
+        // 체력 재생
+        if (playerSkills.stats.healthRegen > 0 && Date.now() - this.lastHealthRegen > 1000) {
+            this.health = Math.min(this.maxHealth, this.health + playerSkills.stats.healthRegen);
+            this.lastHealthRegen = Date.now();
+        }
+
         let distanceFromCenter = Math.sqrt(
             Math.pow(this.x - safezone.x, 2) + Math.pow(this.y - safezone.y, 2)
         );
@@ -244,48 +334,102 @@ class Player {
         }
     }
 
-        shoot() {
+            shoot() {
         if (this.weapon.ammo > 0 && !this.weapon.isReloading && 
             Date.now() - this.weapon.lastShot > this.weapon.fireRate) {
             
             this.weapon.ammo--;
             this.weapon.lastShot = Date.now();
 
-            // 샷건의 경우 여러 발의 펠릿 발사
-            if (this.weapon.type === 'SHOTGUN') {
-                for (let i = 0; i < this.weapon.pellets; i++) {
-                    let spread = (Math.random() - 0.5) * 0.6; // 산탄 확산
-                    bullets.push(new Bullet(
-                        this.x + Math.cos(this.angle) * this.size,
-                        this.y + Math.sin(this.angle) * this.size,
-                        this.angle + spread,
-                        'player',
-                        this.weapon.damage / this.weapon.pellets, // 펠릿당 데미지
-                        this.weapon.range,
-                        this.weapon.type
-                    ));
-                }
-    } else {
-                // 정확도에 따른 확산
-                let spread = (Math.random() - 0.5) * (1 - this.weapon.accuracy) * 0.2;
-                bullets.push(new Bullet(
-                    this.x + Math.cos(this.angle) * this.size,
-                    this.y + Math.sin(this.angle) * this.size,
-                    this.angle + spread,
-                    'player',
-                    this.weapon.damage,
-                    this.weapon.range,
-                    this.weapon.type
-                ));
-            }
+            // 마법 총알 생성
+            let spread = (Math.random() - 0.5) * (1 - this.weapon.accuracy) * 0.2;
+            bullets.push(new Bullet(
+                this.x + Math.cos(this.angle) * this.size,
+                this.y + Math.sin(this.angle) * this.size,
+                this.angle + spread,
+                'player',
+                this.weapon.damage,
+                this.weapon.range,
+                this.weapon.type || 'basic'
+            ));
 
-            createMuzzleFlash(this.x, this.y, this.angle, this.weapon.type);
+            createMuzzleFlash(this.x, this.y, this.angle, this.weapon.type || 'basic');
             
             // 탄약이 다 떨어지면 자동 재장전
             if (this.weapon.ammo === 0 && this.weapon.totalAmmo > 0) {
                 this.reload();
             }
         }
+    }
+
+    // 특수 스킬 사용
+    useSpecialSkill() {
+        if (Date.now() - this.lastSpecialSkill < this.specialSkillCooldown) {
+            return; // 쿨다운 중
+        }
+
+        if (playerSkills.specialSkills.fireball && playerSkills.currentMagic === 'FIRE') {
+            this.castFireball();
+        } else if (playerSkills.specialSkills.blizzard && playerSkills.currentMagic === 'ICE') {
+            this.castBlizzard();
+        } else if (playerSkills.specialSkills.thunderstorm && playerSkills.currentMagic === 'LIGHTNING') {
+            this.castThunderstorm();
+        }
+    }
+
+    castFireball() {
+        this.lastSpecialSkill = Date.now();
+        
+        // 파이어볼 생성 (폭발하는 투사체)
+        particles.push(new FireballProjectile(
+            this.x + Math.cos(this.angle) * this.size,
+            this.y + Math.sin(this.angle) * this.size,
+            this.angle
+        ));
+    }
+
+    castBlizzard() {
+        this.lastSpecialSkill = Date.now();
+        
+        // 모든 적을 빙결
+        enemies.forEach(enemy => {
+            enemy.slowEffect = Math.max(enemy.slowEffect || 1, 0.3); // 70% 속도 감소
+            enemy.slowDuration = Date.now() + 5000; // 5초간 지속
+        });
+        
+        // 블리자드 파티클 효과
+        for (let i = 0; i < 50; i++) {
+            particles.push(new Particle(
+                Math.random() * GAME_CONFIG.MAP_SIZE,
+                Math.random() * GAME_CONFIG.MAP_SIZE,
+                '#87CEEB',
+                Math.random() * 3 + 1,
+                { x: 0, y: Math.random() * 2 + 1 }
+            ));
+        }
+    }
+
+    castThunderstorm() {
+        this.lastSpecialSkill = Date.now();
+        
+        // 모든 적에게 20% 데미지
+        enemies.forEach(enemy => {
+            enemy.takeDamage(enemy.maxHealth * 0.2);
+            
+            // 번개 파티클 효과
+            for (let i = 0; i < 5; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 30,
+                    enemy.y + (Math.random() - 0.5) * 30,
+                    '#FFD700',
+                    Math.random() * 4 + 2,
+                    {
+                        x: (Math.random() - 0.5) * 4,
+                        y: (Math.random() - 0.5) * 4
+                    }
+                ));
+            }
+        });
     }
 
     reload() {
@@ -366,7 +510,21 @@ class Enemy {
         this.shootRange = 120;
     }
 
-    update() {
+        update() {
+        // 화상 데미지 처리
+        if (this.burnDuration && Date.now() < this.burnDuration) {
+            if (!this.lastBurnTick || Date.now() - this.lastBurnTick > 1000) {
+                this.takeDamage(this.burnDamage || 5);
+                this.lastBurnTick = Date.now();
+            }
+        }
+
+        // 이동속도에 빙결 효과 적용
+        let speedMultiplier = 1;
+        if (this.slowDuration && Date.now() < this.slowDuration) {
+            speedMultiplier = this.slowEffect || 0.5;
+        }
+
         let dx = player.x - this.x;
         let dy = player.y - this.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
@@ -375,17 +533,17 @@ class Enemy {
             this.angle = Math.atan2(dy, dx);
             
             if (distance > 30) {
-                this.x += Math.cos(this.angle) * GAME_CONFIG.ENEMY_SPEED;
-                this.y += Math.sin(this.angle) * GAME_CONFIG.ENEMY_SPEED;
+                this.x += Math.cos(this.angle) * GAME_CONFIG.ENEMY_SPEED * speedMultiplier;
+                this.y += Math.sin(this.angle) * GAME_CONFIG.ENEMY_SPEED * speedMultiplier;
             }
 
             if (distance < this.shootRange && Date.now() - this.lastShot > this.fireRate) {
                 this.shoot();
             }
-    } else {
+        } else {
             this.angle += (Math.random() - 0.5) * 0.2;
-            this.x += Math.cos(this.angle) * GAME_CONFIG.ENEMY_SPEED * 0.3;
-            this.y += Math.sin(this.angle) * GAME_CONFIG.ENEMY_SPEED * 0.3;
+            this.x += Math.cos(this.angle) * GAME_CONFIG.ENEMY_SPEED * 0.3 * speedMultiplier;
+            this.y += Math.sin(this.angle) * GAME_CONFIG.ENEMY_SPEED * 0.3 * speedMultiplier;
         }
 
         this.x = Math.max(this.size, Math.min(GAME_CONFIG.MAP_SIZE - this.size, this.x));
@@ -453,31 +611,33 @@ class Bullet {
     }
 
     setBulletProperties() {
+        // 총알 속도에 플레이어 보너스 적용
+        let speedMultiplier = 1 + (playerSkills.stats.bulletSpeedBonus || 0);
+        
         switch(this.weaponType) {
-            case 'SNIPER_RIFLE':
-                this.speed = GAME_CONFIG.BULLET_SPEED * 2; // 저격총은 더 빠름
-                this.size = GAME_CONFIG.BULLET_SIZE + 1.5; // 더 큰 총알
+            case 'FIRE':
+                this.speed = GAME_CONFIG.BULLET_SPEED * speedMultiplier;
+                this.size = GAME_CONFIG.BULLET_SIZE + 1;
                 this.color = '#FF4444'; // 빨간색
+                this.element = 'fire';
                 break;
-            case 'SHOTGUN':
-                this.speed = GAME_CONFIG.BULLET_SPEED * 0.8; // 샷건은 조금 느림
+            case 'ICE':
+                this.speed = GAME_CONFIG.BULLET_SPEED * 0.9 * speedMultiplier;
+                this.size = GAME_CONFIG.BULLET_SIZE + 1;
+                this.color = '#87CEEB'; // 하늘색
+                this.element = 'ice';
+                break;
+            case 'LIGHTNING':
+                this.speed = GAME_CONFIG.BULLET_SPEED * 1.3 * speedMultiplier;
                 this.size = GAME_CONFIG.BULLET_SIZE + 2;
-                this.color = '#FFA500'; // 주황색
+                this.color = '#FFD700'; // 금색
+                this.element = 'lightning';
                 break;
-            case 'SMG':
-                this.speed = GAME_CONFIG.BULLET_SPEED * 1.2; // 기관단총은 빠름
-                this.size = GAME_CONFIG.BULLET_SIZE - 1;
-                this.color = '#00FF00'; // 초록색
-                break;
-            case 'LMG':
-                this.speed = GAME_CONFIG.BULLET_SPEED * 0.9;
-                this.size = GAME_CONFIG.BULLET_SIZE + 3; // 가장 큰 총알
-                this.color = '#8B4513'; // 갈색
-                break;
-            default: // ASSAULT_RIFLE
-                this.speed = GAME_CONFIG.BULLET_SPEED;
+            default: // 기본 무기
+                this.speed = GAME_CONFIG.BULLET_SPEED * speedMultiplier;
                 this.size = GAME_CONFIG.BULLET_SIZE;
-                this.color = this.owner === 'player' ? '#FFD700' : '#FF6666'; // 플레이어는 금색, 적은 연한 빨간색
+                this.color = this.owner === 'player' ? '#FFFFFF' : '#FF6666'; // 플레이어는 흰색, 적은 연한 빨간색
+                this.element = 'basic';
                 break;
         }
     }
@@ -603,6 +763,61 @@ function createBloodSplatter(x, y) {
     }
 }
 
+// 마법 효과 적용
+function applyMagicEffect(bullet, enemy) {
+    if (bullet.owner !== 'player') return;
+    
+    switch(bullet.element) {
+        case 'fire':
+            // 화상 효과
+            enemy.burnDamage = 5 * playerSkills.stats.burnDamage;
+            enemy.burnDuration = Date.now() + 3000; // 3초간 지속
+            break;
+            
+        case 'ice':
+            // 빙결 효과
+            enemy.slowEffect = 0.5 * playerSkills.stats.slowEffect;
+            enemy.slowDuration = Date.now() + 2000; // 2초간 지속
+            break;
+            
+        case 'lightning':
+            // 연쇄 번개
+            chainLightning(enemy.x, enemy.y, bullet.damage);
+            break;
+    }
+}
+
+// 연쇄 번개 효과
+function chainLightning(x, y, damage) {
+    let chainCount = 0;
+    let maxChains = 2;
+    let chainRange = 100 * playerSkills.stats.chainRange;
+    
+    enemies.forEach(enemy => {
+        if (chainCount >= maxChains) return;
+        
+        let distance = Math.sqrt((enemy.x - x) ** 2 + (enemy.y - y) ** 2);
+        if (distance <= chainRange && distance > 0) {
+            enemy.takeDamage(damage * 0.3); // 30% 데미지
+            chainCount++;
+            
+            // 번개 파티클 효과
+            for (let i = 0; i < 3; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 20,
+                    enemy.y + (Math.random() - 0.5) * 20,
+                    '#FFD700',
+                    Math.random() * 3 + 1,
+                    {
+                        x: (Math.random() - 0.5) * 3,
+                        y: (Math.random() - 0.5) * 3
+                    }
+                ));
+            }
+        }
+    });
+}
+
 function initGame() {
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
@@ -645,6 +860,9 @@ function setupEventListeners() {
         }
         if (e.key.toLowerCase() === 't' && gameState === 'playing') {
             openSkillTree();
+        }
+        if (e.key.toLowerCase() === 'e' && gameState === 'playing') {
+            player.useSpecialSkill();
         }
         if (e.key === 'Escape' && gameState === 'skillTree') {
             closeSkillTree();
@@ -794,6 +1012,9 @@ function update() {
                 if (Math.sqrt(dx * dx + dy * dy) < enemy.size) {
                     createBloodSplatter(enemy.x, enemy.y);
                     
+                    // 마법 효과 적용
+                    applyMagicEffect(bullet, enemy);
+                    
                     if (enemy.takeDamage(bullet.damage)) {
                         enemies.splice(j, 1);
                         kills++;
@@ -877,7 +1098,7 @@ function updateUI() {
 
     document.getElementById('currentAmmo').textContent = player.weapon.ammo;
     document.getElementById('totalAmmo').textContent = player.weapon.totalAmmo;
-    document.getElementById('currentWeapon').textContent = WEAPON_TYPES[playerSkills.currentWeapon].name;
+    document.getElementById('currentWeapon').textContent = playerSkills.currentMagic ? MAGIC_TYPES[playerSkills.currentMagic].name : '기본 무기';
     document.getElementById('kills').textContent = kills;
     document.getElementById('survivors').textContent = survivors;
 
@@ -968,48 +1189,54 @@ function closeSkillTree() {
 }
 
 function buildSkillTree() {
-    let activeWeapon = document.querySelector('.weapon-tab.active').dataset.weapon;
-    let skillData = SKILL_TREE[activeWeapon];
+    let activeSkill = document.querySelector('.weapon-tab.active').dataset.weapon;
+    let skillData = SKILL_TREE[activeSkill];
     let content = document.getElementById('skillTreeContent');
     content.innerHTML = '';
 
-    // 기본 무기 해제 스킬
+    // 기본 스킬 해제
     let baseCategory = document.createElement('div');
     baseCategory.className = 'skill-category';
-    baseCategory.innerHTML = `<h3>기본 무기</h3>`;
+    baseCategory.innerHTML = activeSkill === 'STATS' ? `<h3>기본 능력</h3>` : `<h3>마법 해제</h3>`;
     
-    let baseSkill = createSkillItem(skillData.base, activeWeapon, -1);
+    let baseSkill = createSkillItem(skillData.base, activeSkill, -1);
     baseCategory.appendChild(baseSkill);
     content.appendChild(baseCategory);
 
     // 업그레이드 스킬들
-    if (playerSkills.unlockedWeapons.includes(activeWeapon)) {
+    let isUnlocked = activeSkill === 'STATS' || playerSkills.unlockedMagic.includes(activeSkill);
+    if (isUnlocked) {
         let upgradeCategory = document.createElement('div');
         upgradeCategory.className = 'skill-category';
-        upgradeCategory.innerHTML = `<h3>무기 강화</h3>`;
+        upgradeCategory.innerHTML = `<h3>스킬 강화</h3>`;
         
         skillData.upgrades.forEach((upgrade, index) => {
-            let skillItem = createSkillItem(upgrade, activeWeapon, index);
+            let skillItem = createSkillItem(upgrade, activeSkill, index);
             upgradeCategory.appendChild(skillItem);
         });
         
         content.appendChild(upgradeCategory);
     }
 
-    // 무기 변경 버튼 업데이트
-    updateWeaponSwitchButton(activeWeapon);
+    // 마법 변경 버튼 업데이트
+    updateMagicSwitchButton(activeSkill);
 }
 
-function createSkillItem(skillData, weaponType, upgradeIndex) {
-    let isUnlocked = playerSkills.unlockedWeapons.includes(weaponType);
-    let upgradeLevel = playerSkills.weaponUpgrades[weaponType];
+function createSkillItem(skillData, skillType, upgradeIndex) {
+    let isUnlocked = skillType === 'STATS' || playerSkills.unlockedMagic.includes(skillType);
+    let upgradeLevel = playerSkills.skillUpgrades[skillType];
     let canPurchase = false;
     let isPurchased = false;
 
     if (upgradeIndex === -1) {
-        // 기본 무기 스킬
-        canPurchase = !isUnlocked && skillPoints > 0;
-        isPurchased = isUnlocked;
+        // 기본 스킬
+        if (skillType === 'STATS') {
+            canPurchase = skillPoints > 0;
+            isPurchased = true; // 스탯은 항상 해제되어 있음
+        } else {
+            canPurchase = !isUnlocked && skillPoints > 0;
+            isPurchased = isUnlocked;
+        }
     } else {
         // 업그레이드 스킬
         canPurchase = isUnlocked && upgradeIndex === upgradeLevel && skillPoints > 0;
@@ -1037,7 +1264,7 @@ function createSkillItem(skillData, weaponType, upgradeIndex) {
         </div>
         <button class="skill-button ${buttonClass}" 
                 ${!canPurchase ? 'disabled' : ''} 
-                onclick="purchaseSkill('${weaponType}', ${upgradeIndex})">
+                onclick="purchaseSkill('${skillType}', ${upgradeIndex})">
             ${buttonText}
         </button>
     `;
@@ -1045,51 +1272,87 @@ function createSkillItem(skillData, weaponType, upgradeIndex) {
     return skillItem;
 }
 
-function purchaseSkill(weaponType, upgradeIndex) {
+function purchaseSkill(skillType, upgradeIndex) {
     if (skillPoints <= 0) return;
 
     if (upgradeIndex === -1) {
-        // 기본 무기 해제
-        if (!playerSkills.unlockedWeapons.includes(weaponType)) {
-            playerSkills.unlockedWeapons.push(weaponType);
+        // 기본 스킬 해제
+        if (skillType === 'STATS') {
+            // 스탯 스킬은 항상 해제되어 있음
             skillPoints--;
+        } else {
+            // 마법 해제
+            if (!playerSkills.unlockedMagic.includes(skillType)) {
+                playerSkills.unlockedMagic.push(skillType);
+                skillPoints--;
+            }
         }
     } else {
         // 업그레이드 구매
-        if (playerSkills.unlockedWeapons.includes(weaponType) && 
-            upgradeIndex === playerSkills.weaponUpgrades[weaponType]) {
-            playerSkills.weaponUpgrades[weaponType]++;
-            skillPoints--;
+        if (skillType === 'STATS' || playerSkills.unlockedMagic.includes(skillType)) {
+            if (upgradeIndex === playerSkills.skillUpgrades[skillType]) {
+                playerSkills.skillUpgrades[skillType]++;
+                skillPoints--;
+                
+                // 스탯 업그레이드 적용
+                applySkillUpgrade(skillType, upgradeIndex);
+            }
         }
     }
 
-    // 현재 무기 스탯 업데이트
-    if (weaponType === playerSkills.currentWeapon) {
-        player.updateWeaponStats();
-    }
-
+    // 플레이어 스탯 업데이트
+    player.updateStats();
     updateExpUI();
     buildSkillTree();
 }
 
-function updateWeaponSwitchButton(weaponType) {
+function applySkillUpgrade(skillType, upgradeIndex) {
+    let skillData = SKILL_TREE[skillType];
+    let upgrade = skillData.upgrades[upgradeIndex];
+    
+    switch(upgrade.stat) {
+        case 'healthRegen':
+            playerSkills.stats.healthRegen += upgrade.value;
+            break;
+        case 'maxHealth':
+            playerSkills.stats.maxHealthBonus += upgrade.value;
+            break;
+        case 'speed':
+            playerSkills.stats.speedBonus += upgrade.value;
+            break;
+        case 'totalAmmo':
+            playerSkills.stats.totalAmmoBonus += upgrade.value;
+            break;
+        case 'special':
+            playerSkills.specialSkills[upgrade.value] = true;
+            break;
+    }
+}
+
+function updateMagicSwitchButton(skillType) {
     let switchButton = document.getElementById('switchWeapon');
-    let isUnlocked = playerSkills.unlockedWeapons.includes(weaponType);
-    let isCurrent = weaponType === playerSkills.currentWeapon;
+    
+    if (skillType === 'STATS') {
+        switchButton.classList.add('hidden');
+        return;
+    }
+    
+    let isUnlocked = playerSkills.unlockedMagic.includes(skillType);
+    let isCurrent = skillType === playerSkills.currentMagic;
 
     if (isUnlocked && !isCurrent) {
         switchButton.classList.remove('hidden');
-        switchButton.textContent = `${WEAPON_TYPES[weaponType].name}으로 변경`;
-        switchButton.onclick = () => switchWeapon(weaponType);
+        switchButton.textContent = `${MAGIC_TYPES[skillType].name}으로 변경`;
+        switchButton.onclick = () => switchMagic(skillType);
     } else {
         switchButton.classList.add('hidden');
     }
 }
 
-function switchWeapon(weaponType) {
-    if (playerSkills.unlockedWeapons.includes(weaponType)) {
-        playerSkills.currentWeapon = weaponType;
-        player.updateWeaponStats();
+function switchMagic(magicType) {
+    if (playerSkills.unlockedMagic.includes(magicType)) {
+        playerSkills.currentMagic = magicType;
+        player.updateStats();
         closeSkillTree();
     }
 }
