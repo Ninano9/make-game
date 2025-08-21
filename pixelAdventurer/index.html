@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>픽셀 모험가 - Pixel Adventurer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            border: 2px solid #333;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .ui-element {
+            pointer-events: auto;
+        }
+
+        /* 상단 UI */
+        .top-ui {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .stat-bar {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #444;
+            border-radius: 5px;
+            padding: 5px 10px;
+            min-width: 150px;
+        }
+
+        .bar {
+            width: 100%;
+            height: 15px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 3px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .hp-fill { background: linear-gradient(90deg, #ff4444, #ff6666); }
+        .mp-fill { background: linear-gradient(90deg, #4444ff, #6666ff); }
+        .exp-fill { background: linear-gradient(90deg, #44ff44, #66ff66); }
+
+        /* 좌측 UI */
+        .left-ui {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+        }
+
+        .character-portrait {
+            width: 80px;
+            height: 80px;
+            background: #333;
+            border: 2px solid #666;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .status-effects {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .status-effect {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #666;
+            border-radius: 3px;
+            padding: 3px 6px;
+            font-size: 0.8rem;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        /* 우측 UI */
+        .right-ui {
+            position: absolute;
+            top: 80px;
+            right: 10px;
+        }
+
+        .skill-icons {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .skill-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #444;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            position: relative;
+        }
+
+        .skill-cooldown {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            font-size: 0.7rem;
+            padding: 1px 3px;
+            border-radius: 2px;
+        }
+
+        /* 하단 UI */
+        .bottom-ui {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .combat-log {
+            height: 60px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            line-height: 1.2;
+        }
+
+        .log-entry {
+            margin-bottom: 2px;
+        }
+
+        .log-damage { color: #ff6666; }
+        .log-heal { color: #66ff66; }
+        .log-exp { color: #ffff66; }
+        .log-gold { color: #ffd700; }
+
+        /* 우하단 UI */
+        .bottom-right-ui {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 0.8rem;
+        }
+
+        /* 시작 화면 */
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .game-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .class-selection {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .class-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            width: 200px;
+        }
+
+        .class-card:hover {
+            border-color: #66ff66;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .class-card.selected {
+            border-color: #ffff66;
+            background: rgba(255, 255, 102, 0.2);
+        }
+
+        .class-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .class-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .class-description {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            opacity: 0.8;
+        }
+
+        .start-button {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .start-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .start-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 메뉴 화면들 */
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            z-index: 50;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .menu-content {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .menu-title {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffff66;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .class-selection {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .class-card {
+                width: 250px;
+            }
+            
+            .game-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+    
+    <div class="ui-overlay">
+        <!-- 상단 UI -->
+        <div class="top-ui">
+            <div class="stat-bar">
+                <div>HP: <span id="currentHP">100</span>/<span id="maxHP">100</span></div>
+                <div class="bar"><div class="bar-fill hp-fill" id="hpBar" style="width: 100%"></div></div>
+            </div>
+            <div class="stat-bar">
+                <div>MP: <span id="currentMP">50</span>/<span id="maxMP">50</span></div>
+                <div class="bar"><div class="bar-fill mp-fill" id="mpBar" style="width: 100%"></div></div>
+            </div>
+            <div class="stat-bar">
+                <div>경험치: <span id="currentExp">0</span>/<span id="nextLevelExp">42</span></div>
+                <div class="bar"><div class="bar-fill exp-fill" id="expBar" style="width: 0%"></div></div>
+            </div>
+            <div class="stat-bar">
+                <div>Lv.<span id="playerLevel">1</span> | 골드: <span id="playerGold">0</span></div>
+                <div>지역: <span id="currentArea">초록 들판</span></div>
+            </div>
+        </div>
+
+        <!-- 좌측 UI -->
+        <div class="left-ui">
+            <div class="character-portrait" id="characterPortrait">⚔️</div>
+            <div class="status-effects" id="statusEffects">
+                <!-- 상태 효과들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+
+        <!-- 우측 UI -->
+        <div class="right-ui">
+            <div class="skill-icons">
+                <div class="skill-icon" id="skill1" title="스킬 1 (X)">
+                    🔥
+                    <div class="skill-cooldown" id="skill1Cooldown" style="display: none;">3</div>
+                </div>
+                <div class="skill-icon" id="skill2" title="스킬 2 (C)">
+                    ❄️
+                    <div class="skill-cooldown" id="skill2Cooldown" style="display: none;">5</div>
+                </div>
+                <div class="skill-icon" id="skill3" title="스킬 3 (V)">
+                    ⚡
+                    <div class="skill-cooldown" id="skill3Cooldown" style="display: none;">8</div>
+                </div>
+                <div class="skill-icon" title="체력 포션 (A)">💉</div>
+                <div class="skill-icon" title="마나 포션 (S)">🧪</div>
+            </div>
+        </div>
+
+        <!-- 하단 UI -->
+        <div class="bottom-ui">
+            <div><strong>전투 로그</strong></div>
+            <div class="combat-log" id="combatLog">
+                <div class="log-entry">게임을 시작합니다!</div>
+            </div>
+        </div>
+
+        <!-- 우하단 UI -->
+        <div class="bottom-right-ui">
+            <div><strong>조작법</strong></div>
+            <div>← → : 이동</div>
+            <div>Space : 점프</div>
+            <div>Z : 기본 공격</div>
+            <div>X,C,V : 스킬</div>
+            <div>A,S : 포션</div>
+            <div>Esc : 메뉴</div>
+            <div>I : 인벤토리</div>
+            <div>M : 맵</div>
+        </div>
+    </div>
+
+    <!-- 시작 화면 -->
+    <div class="start-screen" id="startScreen">
+        <h1 class="game-title">픽셀 모험가</h1>
+        <div class="class-selection">
+            <div class="class-card" data-class="전사">
+                <div class="class-icon">⚔️</div>
+                <div class="class-name">전사</div>
+                <div class="class-description">근접 전투의 달인<br/>높은 체력과 방어력<br/>강력한 검술 스킬</div>
+            </div>
+            <div class="class-card" data-class="궁수">
+                <div class="class-icon">🏹</div>
+                <div class="class-name">궁수</div>
+                <div class="class-description">원거리 공격 전문<br/>높은 치명타율<br/>관통과 연속 공격</div>
+            </div>
+            <div class="class-card" data-class="마법사">
+                <div class="class-icon">🔮</div>
+                <div class="class-name">마법사</div>
+                <div class="class-description">마법 공격의 대가<br/>광역 피해 특화<br/>상태 이상 부여</div>
+            </div>
+        </div>
+        <button class="start-button" id="startGameButton" disabled>직업을 선택하세요</button>
+    </div>
+
+    <!-- 인벤토리 화면 -->
+    <div class="menu-screen" id="inventoryScreen">
+        <div class="menu-content">
+            <button class="close-button" onclick="closeMenu()">&times;</button>
+            <h2 class="menu-title">인벤토리</h2>
+            <div id="inventoryContent">
+                <!-- 인벤토리 내용이 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 맵 화면 -->
+    <div class="menu-screen" id="mapScreen">
+        <div class="menu-content">
+            <button class="close-button" onclick="closeMenu()">&times;</button>
+            <h2 class="menu-title">지역 맵</h2>
+            <div id="mapContent">
+                <!-- 맵 내용이 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 메뉴 화면 -->
+    <div class="menu-screen" id="menuScreen">
+        <div class="menu-content">
+            <button class="close-button" onclick="closeMenu()">&times;</button>
+            <h2 class="menu-title">게임 메뉴</h2>
+            <div id="menuContent">
+                <button onclick="saveGame()">게임 저장</button>
+                <button onclick="loadGame()">게임 불러오기</button>
+                <button onclick="goToMainMenu()">메인 메뉴로</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/monster.js"></script>
+    <script src="js/item.js"></script>
+    <script src="js/combat.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/save.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
