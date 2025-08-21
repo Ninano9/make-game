@@ -26,6 +26,7 @@ let darkOrbs = [];
 let darkVoids = [];
 let fireballProjectiles = [];
 let explosionRings = [];
+let blackholes = [];
 let camera = { x: 0, y: 0 };
 let keys = {};
 let mouse = { x: 0, y: 0, down: false };
@@ -175,7 +176,12 @@ const SKILL_TREE = {
             { name: '빙결 강화', description: '빙결 효과 +50%', stat: 'slowEffect', value: 0.5 },
             { name: '마나 효율', description: '재장전 속도 +25%', stat: 'reloadTime', value: -0.25 },
             { name: '블리자드', description: 'E키로 전체 적 빙결', stat: 'special', value: 'blizzard' },
-            { name: '절대영도', description: '얼음 데미지 +60%', stat: 'damage', value: 0.6 }
+            { name: '절대영도', description: '얼음 데미지 +60%', stat: 'damage', value: 0.6 },
+            { name: '빙하 갑옷', description: '피격 시 공격자 빙결', stat: 'iceArmor', value: true },
+            { name: '서리 확산', description: '빙결된 적 주변도 빙결', stat: 'frostSpread', value: true },
+            { name: '얼음 창', description: '총알이 얼음 조각을 발사', stat: 'iceShards', value: true },
+            { name: '영구동토', description: '빙결 지속시간 +100%', stat: 'freezeDuration', value: 1.0 },
+            { name: '❄️ 빙하기', description: 'Q키로 맵 전체를 얼음으로 덮음', stat: 'ultimate', value: 'iceage' }
         ]
     },
     // 번개 마법 스킬
@@ -187,7 +193,10 @@ const SKILL_TREE = {
             { name: '천둥폭풍', description: 'E키로 모든 적에게 피해', stat: 'special', value: 'thunderstorm' },
             { name: '번개 속도', description: '총알 속도 +80%', stat: 'bulletSpeed', value: 0.8 },
             { name: '전기 충격', description: '연쇄 데미지 +20%', stat: 'chainDamage', value: 0.2 },
-            { name: '광속 이동', description: '이동속도 +25%', stat: 'speed', value: 0.25 }
+            { name: '광속 이동', description: '이동속도 +25%', stat: 'speed', value: 0.25 },
+            { name: '뇌전 축적', description: '연쇄 수 +2', stat: 'chainCount', value: 2 },
+            { name: '전자기장', description: '주변 적들이 끌려옴', stat: 'magneticField', value: true },
+            { name: '⚡ 제우스의 분노', description: 'Q키로 하늘에서 거대한 번개 낙하', stat: 'ultimate', value: 'zeus' }
         ]
     },
     // 암흑 마법 스킬
@@ -199,7 +208,10 @@ const SKILL_TREE = {
             { name: '암흑 영역', description: 'E키로 5개의 암흑 동그라미 생성', stat: 'special', value: 'darkvoid' },
             { name: '영혼 흡수', description: '적 처치 시 체력 +10 회복', stat: 'lifesteal', value: 10 },
             { name: '그림자 속도', description: '시전속도 +35%', stat: 'fireRate', value: -0.35 },
-            { name: '절망의 오라', description: '암흑 영역 지속시간 +2초', stat: 'voidDuration', value: 2 }
+            { name: '절망의 오라', description: '암흑 영역 지속시간 +2초', stat: 'voidDuration', value: 2 },
+            { name: '어둠의 보호막', description: '체력이 낮을 때 무적', stat: 'darkShield', value: true },
+            { name: '공허 균열', description: '총알이 공간을 찢어 관통', stat: 'voidRift', value: true },
+            { name: '🌑 블랙홀', description: 'Q키로 거대한 블랙홀 생성', stat: 'ultimate', value: 'blackhole' }
         ]
     }
 };
@@ -251,6 +263,8 @@ class Player {
         this.isRunning = false;
         this.lastSpecialSkill = 0;
         this.specialSkillCooldown = 10000; // 10초 쿨다운
+        this.lastUltimate = 0;
+        this.ultimateCooldown = 25000; // 25초 쿨다운
         this.lastHealthRegen = 0;
         
         // 기본 무기 설정 (마법이 없을 때)
@@ -419,6 +433,170 @@ class Player {
         } else if (playerSkills.specialSkills.darkvoid && playerSkills.currentMagic === 'DARK') {
             this.castDarkVoid();
             this.lastSpecialSkill = Date.now();
+        }
+    }
+    
+    // 궁극기 사용
+    useUltimate() {
+        if (Date.now() - this.lastUltimate < this.ultimateCooldown) {
+            return; // 쿨다운 중
+        }
+
+        const currentMagic = playerSkills.currentMagic;
+        const skillLevel = playerSkills.skillUpgrades[currentMagic];
+        
+        // 9번째 스킬(궁극기)이 해제되어야 사용 가능
+        if (skillLevel >= 9) {
+            if (currentMagic === 'FIRE' && playerSkills.specialSkills.inferno) {
+                this.castInferno();
+                this.lastUltimate = Date.now();
+            } else if (currentMagic === 'ICE' && playerSkills.specialSkills.iceage) {
+                this.castIceAge();
+                this.lastUltimate = Date.now();
+            } else if (currentMagic === 'LIGHTNING' && playerSkills.specialSkills.zeus) {
+                this.castZeus();
+                this.lastUltimate = Date.now();
+            } else if (currentMagic === 'DARK' && playerSkills.specialSkills.blackhole) {
+                this.castBlackhole();
+                this.lastUltimate = Date.now();
+            }
+        }
+    }
+    
+    // 🔥 인페르노 궁극기 - 거대한 화염 폭풍
+    castInferno() {
+        // 플레이어 중심으로 거대한 화염 폭풍 생성
+        for (let angle = 0; angle < Math.PI * 2; angle += 0.2) {
+            for (let radius = 50; radius <= 300; radius += 50) {
+                const x = this.x + Math.cos(angle) * radius;
+                const y = this.y + Math.sin(angle) * radius;
+                
+                fireballProjectiles.push(new FireballProjectile(x, y, angle));
+                
+                // 화염 파티클
+                for (let i = 0; i < 10; i++) {
+                    particles.push(new Particle(
+                        x + (Math.random() - 0.5) * 40,
+                        y + (Math.random() - 0.5) * 40,
+                        ['#FF4500', '#FF6347', '#FFD700'][Math.floor(Math.random() * 3)],
+                        Math.random() * 15 + 10,
+                        {
+                            x: (Math.random() - 0.5) * 12,
+                            y: (Math.random() - 0.5) * 12
+                        }
+                    ));
+                }
+            }
+        }
+        
+        // 모든 적에게 즉시 화상 데미지
+        enemies.forEach(enemy => {
+            enemy.burnDuration = Date.now() + 8000; // 8초간 화상
+            enemy.burnDamage = 15;
+            enemy.takeDamage(30);
+        });
+    }
+    
+    // ❄️ 빙하기 궁극기 - 맵 전체 얼음
+    castIceAge() {
+        // 맵 전체를 얼음으로 덮는 효과
+        for (let i = 0; i < 500; i++) {
+            particles.push(new Particle(
+                camera.x + Math.random() * GAME_CONFIG.CANVAS_WIDTH,
+                camera.y + Math.random() * GAME_CONFIG.CANVAS_HEIGHT,
+                ['#87CEEB', '#B0E0E6', '#E0FFFF'][Math.floor(Math.random() * 3)],
+                Math.random() * 20 + 10,
+                {
+                    x: (Math.random() - 0.5) * 8,
+                    y: Math.random() * 6 + 3
+                }
+            ));
+        }
+        
+        // 모든 적을 5초간 완전 정지
+        enemies.forEach(enemy => {
+            enemy.slowDuration = Date.now() + 15000; // 15초간 빙결
+            enemy.slowEffect = 0.1; // 90% 속도 감소
+            enemy.takeDamage(50);
+            
+            // 각 적 주변에 얼음 효과
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 80,
+                    enemy.y + (Math.random() - 0.5) * 80,
+                    '#87CEEB',
+                    Math.random() * 8 + 4,
+                    {
+                        x: (Math.random() - 0.5) * 4,
+                        y: (Math.random() - 0.5) * 4
+                    }
+                ));
+            }
+        });
+    }
+    
+    // ⚡ 제우스의 분노 궁극기 - 거대한 번개 낙하
+    castZeus() {
+        // 각 적에게 거대한 번개 낙하
+        enemies.forEach(enemy => {
+            // 하늘에서 번개 기둥 생성
+            for (let i = 0; i < 50; i++) {
+                particles.push(new Particle(
+                    enemy.x + (Math.random() - 0.5) * 100,
+                    enemy.y - 200 + i * 4,
+                    ['#FFD700', '#FFFF00', '#FFF8DC'][Math.floor(Math.random() * 3)],
+                    Math.random() * 25 + 15,
+                    {
+                        x: (Math.random() - 0.5) * 6,
+                        y: Math.random() * 15 + 5
+                    }
+                ));
+            }
+            
+            // 연쇄 번개를 5번 반복
+            for (let chain = 0; chain < 5; chain++) {
+                setTimeout(() => {
+                    enemy.takeDamage(40);
+                    chainLightning(enemy.x, enemy.y, 60);
+                }, chain * 200);
+            }
+        });
+        
+        // 플레이어 주변에도 번개 효과
+        for (let i = 0; i < 100; i++) {
+            particles.push(new Particle(
+                this.x + (Math.random() - 0.5) * 200,
+                this.y + (Math.random() - 0.5) * 200,
+                '#FFFF00',
+                Math.random() * 20 + 10,
+                {
+                    x: (Math.random() - 0.5) * 10,
+                    y: (Math.random() - 0.5) * 10
+                }
+            ));
+        }
+    }
+    
+    // 🌑 블랙홀 궁극기 - 거대한 블랙홀 생성
+    castBlackhole() {
+        // 플레이어 앞에 거대한 블랙홀 생성
+        const blackholeX = this.x + Math.cos(this.angle) * 100;
+        const blackholeY = this.y + Math.sin(this.angle) * 100;
+        
+        blackholes.push(new Blackhole(blackholeX, blackholeY, 8)); // 8초간 지속
+        
+        // 블랙홀 생성 효과
+        for (let i = 0; i < 80; i++) {
+            particles.push(new Particle(
+                blackholeX + (Math.random() - 0.5) * 150,
+                blackholeY + (Math.random() - 0.5) * 150,
+                ['#8A2BE2', '#4B0082', '#000000'][Math.floor(Math.random() * 3)],
+                Math.random() * 25 + 15,
+                {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                }
+            ));
         }
     }
     
@@ -871,6 +1049,12 @@ class Bullet {
                 this.color = '#FFD700'; // 금색
                 this.element = 'lightning';
                 break;
+            case 'DARK':
+                this.speed = GAME_CONFIG.BULLET_SPEED * 0.95 * speedMultiplier;
+                this.size = GAME_CONFIG.BULLET_SIZE + 1;
+                this.color = '#000000'; // 검은색
+                this.element = 'dark';
+                break;
             default: // 기본 무기
                 if (this.owner === 'enemy') {
                     this.speed = GAME_CONFIG.BULLET_SPEED * 0.8; // 적 총알은 20% 느리게
@@ -923,49 +1107,75 @@ class Bullet {
     }
 }
 
-// 암흑 오브 클래스 (검은 점)
+// 암흑 오브 클래스 (끌어당기는 검은 동그라미)
 class DarkOrb {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.size = 8;
-        this.life = 0.8; // 0.8초
-        this.maxLife = 0.8;
+        this.size = 25; // 0.5칸 크기 (25px)
+        this.life = 0.5; // 0.5초 지속
+        this.maxLife = 0.5;
         this.createdAt = Date.now();
-        this.pulseSpeed = 5;
+        this.pulseSpeed = 8;
         this.alpha = 1;
+        this.pullRange = 25; // 0.5칸 범위 (25px)
     }
     
     update() {
         const elapsed = (Date.now() - this.createdAt) / 1000;
         this.life = this.maxLife - elapsed;
         this.alpha = Math.max(0, this.life / this.maxLife);
+        
+        // 0.5초 동안 지속적으로 끌어당기기
+        if (this.life > 0) {
+            enemies.forEach(enemy => {
+                const dx = enemy.x - this.x;
+                const dy = enemy.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 0.5칸 범위 안에 있는 적만 끌어당기기
+                if (distance < this.pullRange && distance > 0) {
+                    const pullStrength = 3 * (1 + playerSkills.stats.pullForce); // 끌어당기는 힘
+                    enemy.x -= (dx / distance) * pullStrength;
+                    enemy.y -= (dy / distance) * pullStrength;
+                }
+            });
+        }
+        
         return this.life <= 0;
     }
     
     draw() {
         const pulse = Math.sin(Date.now() * this.pulseSpeed / 1000) * 0.3 + 0.7;
-        const currentSize = this.size * pulse;
         
         ctx.save();
         ctx.globalAlpha = this.alpha;
         
-        // 외부 어두운 원
-        ctx.fillStyle = '#1a0d1a';
+        // 끌어당기는 범위 표시 (0.5칸 원)
+        ctx.strokeStyle = '#4B0082';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
         ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize + 2, 0, Math.PI * 2);
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.pullRange * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // 외부 어두운 원
+        ctx.fillStyle = 'rgba(26, 13, 26, 0.6)';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.pullRange * pulse, 0, Math.PI * 2);
         ctx.fill();
         
-        // 내부 검은 원
+        // 내부 검은 원 (중심)
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize, 0, Math.PI * 2);
+        ctx.arc(this.x - camera.x, this.y - camera.y, 8 * pulse, 0, Math.PI * 2);
         ctx.fill();
         
         // 중앙 보라색 점
         ctx.fillStyle = '#8A2BE2';
         ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, currentSize * 0.3, 0, Math.PI * 2);
+        ctx.arc(this.x - camera.x, this.y - camera.y, 3 * pulse, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
@@ -1056,129 +1266,112 @@ class DarkVoid {
     }
 }
 
-// 파이어볼 투사체 클래스
-class FireballProjectile {
-    constructor(x, y, angle) {
+
+
+// 블랙홀 클래스
+class Blackhole {
+    constructor(x, y, duration) {
         this.x = x;
         this.y = y;
-        this.angle = angle;
-        this.speed = 8;
-        this.size = 15;
-        this.life = 200; // 이동 거리
-        this.exploded = false;
+        this.duration = duration;
+        this.maxDuration = duration;
+        this.createdAt = Date.now();
+        this.radius = 150;
+        this.pullForce = 8;
+        this.damageRadius = 100;
     }
     
     update() {
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
-        this.life--;
+        const elapsed = (Date.now() - this.createdAt) / 1000;
+        this.duration = this.maxDuration - elapsed;
         
-        // 적과 충돌 확인
-        for (let enemy of enemies) {
+        // 모든 적을 블랙홀로 끌어당김
+        enemies.forEach(enemy => {
             const dx = this.x - enemy.x;
             const dy = this.y - enemy.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance < this.size + enemy.size) {
-                this.explode();
-                return true;
-            }
-        }
-        
-        if (this.life <= 0) {
-            this.explode();
-            return true;
-        }
-        
-        return false;
-    }
-    
-    explode() {
-        if (this.exploded) return;
-        this.exploded = true;
-        
-        // 폭발 링 생성
-        explosionRings.push(new ExplosionRing(this.x, this.y, 80));
-        
-        // 범위 내 적들에게 데미지와 화상 효과
-        enemies.forEach(enemy => {
-            const dx = enemy.x - this.x;
-            const dy = enemy.y - this.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance < 80) {
-                enemy.takeDamage(50);
-                enemy.burnDuration = Date.now() + 4000; // 4초간 화상
-                enemy.burnDamage = 8;
+            if (distance < this.radius) {
+                // 끌어당기는 힘
+                const force = this.pullForce * (this.radius - distance) / this.radius;
+                enemy.x += (dx / distance) * force;
+                enemy.y += (dy / distance) * force;
+                
+                // 데미지 영역에 있으면 지속 데미지
+                if (distance < this.damageRadius) {
+                    enemy.takeDamage(2);
+                    
+                    // 흡수 파티클
+                    particles.push(new Particle(
+                        enemy.x + (Math.random() - 0.5) * 20,
+                        enemy.y + (Math.random() - 0.5) * 20,
+                        '#8A2BE2',
+                        Math.random() * 6 + 3,
+                        {
+                            x: (dx / distance) * 3,
+                            y: (dy / distance) * 3
+                        }
+                    ));
+                }
             }
         });
         
-        // 폭발 파티클
-        for (let i = 0; i < 30; i++) {
+        // 블랙홀 파티클 효과
+        for (let i = 0; i < 5; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * this.radius;
             particles.push(new Particle(
-                this.x + (Math.random() - 0.5) * 60,
-                this.y + (Math.random() - 0.5) * 60,
-                ['#FF4500', '#FF6347', '#FFD700', '#FF8C00'][Math.floor(Math.random() * 4)],
-                Math.random() * 12 + 6,
+                this.x + Math.cos(angle) * radius,
+                this.y + Math.sin(angle) * radius,
+                ['#000000', '#4B0082', '#8A2BE2'][Math.floor(Math.random() * 3)],
+                Math.random() * 8 + 4,
                 {
-                    x: (Math.random() - 0.5) * 15,
-                    y: (Math.random() - 0.5) * 15
+                    x: -Math.cos(angle) * 2,
+                    y: -Math.sin(angle) * 2
                 }
             ));
         }
+        
+        return this.duration <= 0;
     }
     
     draw() {
-        // 파이어볼 그리기
+        const alpha = Math.max(0, this.duration / this.maxDuration);
+        const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
+        
         ctx.save();
+        ctx.globalAlpha = alpha * 0.8;
         
-        // 외부 불꽃
-        ctx.fillStyle = '#FF4500';
+        // 외부 끌어당김 영역
+        ctx.strokeStyle = '#4B0082';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 5]);
         ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 내부 불꽃
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, this.size * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 중앙 밝은 점
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, this.size * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
-    }
-}
-
-// 폭발 링 클래스
-class ExplosionRing {
-    constructor(x, y, maxRadius) {
-        this.x = x;
-        this.y = y;
-        this.radius = 0;
-        this.maxRadius = maxRadius;
-        this.life = 1.0;
-        this.decay = 0.05;
-    }
-    
-    update() {
-        this.radius += (this.maxRadius - this.radius) * 0.3;
-        this.life -= this.decay;
-        return this.life <= 0;
-    }
-    
-    draw() {
-        ctx.save();
-        ctx.globalAlpha = this.life;
-        ctx.strokeStyle = '#FF4500';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius, 0, Math.PI * 2);
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.radius * pulse, 0, Math.PI * 2);
         ctx.stroke();
+        
+        // 데미지 영역
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, this.damageRadius * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 블랙홀
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x - camera.x, this.y - camera.y, 30 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 빛 왜곡 효과
+        ctx.strokeStyle = '#8A2BE2';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.arc(this.x - camera.x, this.y - camera.y, (50 + i * 15) * pulse, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
         ctx.restore();
     }
 }
@@ -1536,29 +1729,7 @@ class ExplosionRing {
     }
 }
 
-function initGame() {
-    canvas = document.getElementById('gameCanvas');
-    ctx = canvas.getContext('2d');
-    
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
 
-    player = new Player(GAME_CONFIG.MAP_SIZE / 2, GAME_CONFIG.MAP_SIZE / 2);
-
-    enemies = [];
-    for (let i = 0; i < GAME_CONFIG.INITIAL_ENEMIES; i++) {
-        let x, y;
-        do {
-            x = Math.random() * GAME_CONFIG.MAP_SIZE;
-            y = Math.random() * GAME_CONFIG.MAP_SIZE;
-        } while (Math.sqrt((x - player.x) ** 2 + (y - player.y) ** 2) < 100);
-        
-        enemies.push(new Enemy(x, y));
-    }
-
-    survivors = GAME_CONFIG.INITIAL_ENEMIES + 1;
-    setupEventListeners();
-}
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -1581,6 +1752,9 @@ function setupEventListeners() {
         }
         if (e.key.toLowerCase() === 'e' && gameState === 'playing') {
             player.useSpecialSkill();
+        }
+        if (e.key.toLowerCase() === 'q' && gameState === 'playing') {
+            player.useUltimate();
         }
         if (e.key === 'Escape' && gameState === 'skillTree') {
             closeSkillTree();
@@ -1663,6 +1837,7 @@ function restartGame() {
     darkVoids = [];
     fireballProjectiles = [];
     explosionRings = [];
+    blackholes = [];
     
     // 스킬 초기화
     playerSkills = {
@@ -1693,7 +1868,11 @@ function restartGame() {
             fireball: false,
             blizzard: false,
             thunderstorm: false,
-            darkvoid: false
+            darkvoid: false,
+            inferno: false,
+            iceage: false,
+            zeus: false,
+            blackhole: false
         }
     };
     
@@ -1838,12 +2017,42 @@ function update() {
             explosionRings.splice(i, 1);
         }
     }
+    
+    // Blackhole 업데이트
+    for (let i = blackholes.length - 1; i >= 0; i--) {
+        if (blackholes[i].update()) {
+            blackholes.splice(i, 1);
+        }
+    }
 
     if (enemies.length === 0) {
         gameState = 'gameOver';
     }
 
     updateUI();
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawMap();
+    // drawSafezone(); // 세이프존 원 제거
+    
+    // 배경 효과들 먼저 그리기
+    darkVoids.forEach(void_ => void_.draw());
+    explosionRings.forEach(ring => ring.draw());
+    blackholes.forEach(blackhole => blackhole.draw());
+    
+    // 게임 오브젝트들
+    enemies.forEach(enemy => enemy.draw());
+    player.draw();
+    bullets.forEach(bullet => bullet.draw());
+    fireballProjectiles.forEach(fireball => fireball.draw());
+    
+    // 전경 효과들
+    particles.forEach(particle => particle.draw());
+    darkOrbs.forEach(orb => orb.draw());
+    
+    updateMinimap();
 }
 
 // 마법 효과 적용 함수
@@ -1867,29 +2076,8 @@ function applyMagicEffect(bullet, enemy) {
             break;
             
         case 'dark':
-            // 암흑 오브 생성
+            // 암흑 오브 생성 (맞은 적의 위치에서 0.5초간 주변 적들을 끌어당김)
             darkOrbs.push(new DarkOrb(enemy.x, enemy.y));
-            
-            // 끌어당기기 효과 (0.5 네모칸 = 약 25px)
-            const pullRange = 25 * playerSkills.stats.pullForce;
-            enemies.forEach(nearbyEnemy => {
-                if (nearbyEnemy !== enemy) {
-                    const dx = nearbyEnemy.x - enemy.x;
-                    const dy = nearbyEnemy.y - enemy.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < pullRange && distance > 0) {
-                        // 끌어당기는 힘 적용
-                        const pullStrength = 2 * playerSkills.stats.pullForce;
-                        nearbyEnemy.x -= (dx / distance) * pullStrength;
-                        nearbyEnemy.y -= (dy / distance) * pullStrength;
-                        
-                        // 끌려온 적에게 초당 데미지
-                        nearbyEnemy.darkDamage = Date.now() + 500; // 0.5초간 지속
-                        nearbyEnemy.darkDamageAmount = Math.floor(bullet.damage * 0.1);
-                    }
-                }
-            });
             break;
     }
 }
@@ -1970,6 +2158,9 @@ function updateUI() {
     
     // 스킬 쿨다운 UI 업데이트
     updateSkillCooldownUI();
+    
+    // 궁극기 쿨다운 UI 업데이트
+    updateUltimateCooldownUI();
 
     if (gameState === 'gameOver') {
         document.getElementById('finalKills').textContent = kills;
@@ -2025,6 +2216,26 @@ function updateSkillCooldownUI() {
         }
     } else {
         cooldownElement.classList.add('hidden');
+    }
+}
+
+// 궁극기 쿨다운 UI 업데이트
+function updateUltimateCooldownUI() {
+    const ultimateElement = document.getElementById('ultimateCooldown');
+    const ultimateTimeElement = document.getElementById('ultimateTime');
+    
+    if (player && player.lastUltimate) {
+        const timeSinceUltimate = Date.now() - player.lastUltimate;
+        const remainingCooldown = Math.max(0, player.ultimateCooldown - timeSinceUltimate);
+        
+        if (remainingCooldown > 0) {
+            ultimateElement.classList.remove('hidden');
+            ultimateTimeElement.textContent = Math.ceil(remainingCooldown / 1000);
+        } else {
+            ultimateElement.classList.add('hidden');
+        }
+    } else {
+        ultimateElement.classList.add('hidden');
     }
 }
 
