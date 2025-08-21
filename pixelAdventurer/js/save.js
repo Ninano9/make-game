@@ -131,7 +131,7 @@ class SaveSystem {
             consumables: player.inventory.consumables || {},
             
             // 장비 아이템
-            items: player.inventory.items.map(item => ({
+            items: (player.inventory.items || []).map(item => ({
                 name: item.name,
                 type: item.type,
                 rarity: item.rarity,
@@ -141,10 +141,10 @@ class SaveSystem {
             })),
             
             // 착용 중인 장비
-            equipment: {},
+            equipment: player.equipment.slots || {},
             
             // 인벤토리 설정
-            maxSlots: player.inventory.maxSlots
+            maxSlots: player.inventory.maxSlots || 50
         };
     }
     
@@ -277,6 +277,29 @@ class SaveSystem {
                     item.calculateOptions(); // 옵션 재계산
                     item.calculatePrice(); // 가격 재계산
                     player.inventory.items.push(item);
+                }
+            }
+        }
+        
+        // 장비 복원
+        if (inventoryData.equipment) {
+            for (let slotType in inventoryData.equipment) {
+                if (inventoryData.equipment[slotType]) {
+                    // 장비 아이템 데이터에서 Item 객체 생성
+                    const equipData = inventoryData.equipment[slotType];
+                    let originalItemData = null;
+                    
+                    if (equipData.type === "무기" && ITEMS.장비.무기[equipData.name]) {
+                        originalItemData = ITEMS.장비.무기[equipData.name];
+                    }
+                    
+                    if (originalItemData) {
+                        const item = new Item(originalItemData, 1, equipData.rarity);
+                        item.enhancement = equipData.enhancement || 0;
+                        item.calculateOptions();
+                        item.calculatePrice();
+                        player.equipment.slots[slotType] = item;
+                    }
                 }
             }
         }

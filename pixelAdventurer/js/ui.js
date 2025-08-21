@@ -234,7 +234,7 @@ class UIManager {
         const consumableDiv = document.createElement('div');
         consumableDiv.innerHTML = '<h4>소비 아이템</h4>';
         
-        for (let itemName in player.inventory.consumables) {
+        for (let itemName in (player.inventory.consumables || {})) {
             const count = player.inventory.consumables[itemName];
             if (count > 0) {
                 const itemDiv = document.createElement('div');
@@ -253,7 +253,7 @@ class UIManager {
         const equipDiv = document.createElement('div');
         equipDiv.innerHTML = '<h4>장비 아이템</h4>';
         
-        for (let item of player.inventory.items) {
+        for (let item of (player.inventory.items || [])) {
             const itemDiv = document.createElement('div');
             itemDiv.innerHTML = item.getDisplayName();
             itemDiv.style.padding = '5px';

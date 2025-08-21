@@ -232,7 +232,18 @@ class Monster {
     }
     
     takeDamage(amount, type = "physical") {
-        if (this.isDead) return 0;
+        console.log(`${this.name} takeDamage 호출됨:`, {
+            amount: amount,
+            type: type,
+            isDead: this.isDead,
+            currentHP: this.currentHP,
+            defense: this.defense
+        });
+        
+        if (this.isDead) {
+            console.log("몬스터가 이미 죽어서 데미지 무시");
+            return 0;
+        }
         
         let finalDamage = amount;
         
@@ -243,13 +254,18 @@ class Monster {
             finalDamage = Math.max(1, amount - this.magicResist);
         }
         
+        console.log(`${this.name} 최종 데미지:`, finalDamage, "기존 HP:", this.currentHP);
+        
         this.currentHP = Math.max(0, this.currentHP - finalDamage);
+        
+        console.log(`${this.name} 새로운 HP:`, this.currentHP);
         
         // 피격 이펙트
         this.createHitEffect();
         
         // 사망 확인
         if (this.currentHP <= 0) {
+            console.log(`${this.name} 사망!`);
             this.die();
         }
         
@@ -280,10 +296,10 @@ class Monster {
                 if (drop.아이템 === "골드") continue; // 이미 처리됨
                 
                 // 인벤토리에 아이템 추가
-                if (!player.inventory[drop.아이템]) {
-                    player.inventory[drop.아이템] = 0;
+                if (!player.inventory.consumables[drop.아이템]) {
+                    player.inventory.consumables[drop.아이템] = 0;
                 }
-                player.inventory[drop.아이템]++;
+                player.inventory.consumables[drop.아이템]++;
                 
                 game.addCombatLog(`${drop.아이템} 획득!`, "gold");
             }
@@ -329,15 +345,8 @@ class Monster {
     draw(ctx) {
         if (this.isDead) return;
         
-        // 몬스터 몸체 그리기
-        ctx.fillStyle = this.getMonsterColor();
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-        
-        // 몬스터 아이콘 그리기
-        ctx.font = "20px monospace";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "center";
-        ctx.fillText(this.data.아이콘, this.x + this.width/2, this.y + this.height/2 + 7);
+        // 고양이 몬스터 그리기
+        this.drawEnemyCat(ctx);
         
         // HP바 그리기
         this.drawHealthBar(ctx);
@@ -350,6 +359,231 @@ class Monster {
         ctx.fillStyle = "#ffff00";
         ctx.textAlign = "center";
         ctx.fillText(`Lv.${this.level}`, this.x + this.width/2, this.y - 5);
+    }
+    
+    drawEnemyCat(ctx) {
+        const centerX = this.x + this.width/2;
+        const centerY = this.y + this.height/2;
+        const monsterColor = this.getMonsterColor();
+        
+        ctx.save();
+        
+        // 좌우 반전 (플레이어 쪽을 바라보도록)
+        if (this.facing < 0) {
+            ctx.scale(-1, 1);
+            ctx.translate(-centerX * 2, 0);
+        }
+        
+        // 애니메이션 효과
+        let bounceY = 0;
+        let eyeState = "normal";
+        
+        if (this.targetPlayer) {
+            bounceY = Math.sin(Date.now() * 0.01) * 1;
+            eyeState = "angry";
+        } else {
+            bounceY = Math.sin(Date.now() * 0.005) * 0.5;
+        }
+        
+        // 몸통 (적 고양이는 약간 더 각져보이게)
+        ctx.fillStyle = monsterColor;
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY + bounceY, 10, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 머리
+        ctx.fillStyle = monsterColor;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY - 12 + bounceY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 귀 (적 고양이는 더 뾰족하게)
+        ctx.fillStyle = monsterColor;
+        ctx.beginPath();
+        // 왼쪽 귀
+        ctx.moveTo(centerX - 6, centerY - 16 + bounceY);
+        ctx.lineTo(centerX - 3, centerY - 22 + bounceY);
+        ctx.lineTo(centerX - 1, centerY - 15 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 오른쪽 귀  
+        ctx.beginPath();
+        ctx.moveTo(centerX + 6, centerY - 16 + bounceY);
+        ctx.lineTo(centerX + 3, centerY - 22 + bounceY);
+        ctx.lineTo(centerX + 1, centerY - 15 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 귀 안쪽 (어두운 빨간색)
+        ctx.fillStyle = "#8B0000";
+        ctx.beginPath();
+        ctx.moveTo(centerX - 5, centerY - 16 + bounceY);
+        ctx.lineTo(centerX - 3, centerY - 19 + bounceY);
+        ctx.lineTo(centerX - 2, centerY - 15 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX + 5, centerY - 16 + bounceY);
+        ctx.lineTo(centerX + 3, centerY - 19 + bounceY);
+        ctx.lineTo(centerX + 2, centerY - 15 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 눈
+        ctx.fillStyle = "#FF0000";
+        if (eyeState === "angry") {
+            // 화난 빨간 눈
+            ctx.beginPath();
+            ctx.arc(centerX - 3, centerY - 13 + bounceY, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX + 3, centerY - 13 + bounceY, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 눈빛 효과
+            ctx.fillStyle = "#FFFF00";
+            ctx.beginPath();
+            ctx.arc(centerX - 3, centerY - 13 + bounceY, 1, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX + 3, centerY - 13 + bounceY, 1, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // 일반 노란 눈
+            ctx.fillStyle = "#FFFF00";
+            ctx.beginPath();
+            ctx.arc(centerX - 3, centerY - 13 + bounceY, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX + 3, centerY - 13 + bounceY, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 코 (검은색)
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - 10 + bounceY);
+        ctx.lineTo(centerX - 1, centerY - 8 + bounceY);
+        ctx.lineTo(centerX + 1, centerY - 8 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 입 (사악한 미소)
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY - 7 + bounceY, 2, 0, Math.PI);
+        ctx.stroke();
+        
+        // 송곳니 (적만의 특징)
+        ctx.fillStyle = "#FFF";
+        ctx.beginPath();
+        ctx.moveTo(centerX - 2, centerY - 7 + bounceY);
+        ctx.lineTo(centerX - 1, centerY - 5 + bounceY);
+        ctx.lineTo(centerX - 0.5, centerY - 7 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX + 2, centerY - 7 + bounceY);
+        ctx.lineTo(centerX + 1, centerY - 5 + bounceY);
+        ctx.lineTo(centerX + 0.5, centerY - 7 + bounceY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 수염 (더 삐쳐보이게)
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        // 왼쪽 수염
+        ctx.beginPath();
+        ctx.moveTo(centerX - 6, centerY - 9 + bounceY);
+        ctx.lineTo(centerX - 10, centerY - 7 + bounceY);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX - 6, centerY - 7 + bounceY);
+        ctx.lineTo(centerX - 10, centerY - 8 + bounceY);
+        ctx.stroke();
+        
+        // 오른쪽 수염
+        ctx.beginPath();
+        ctx.moveTo(centerX + 6, centerY - 9 + bounceY);
+        ctx.lineTo(centerX + 10, centerY - 7 + bounceY);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX + 6, centerY - 7 + bounceY);
+        ctx.lineTo(centerX + 10, centerY - 8 + bounceY);
+        ctx.stroke();
+        
+        // 꼬리 (날카롭게)
+        ctx.fillStyle = monsterColor;
+        ctx.beginPath();
+        const tailX = centerX - 8;
+        const tailY = centerY + 3 + bounceY;
+        // 삼각형 꼬리
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(tailX - 3, tailY - 2);
+        ctx.lineTo(tailX - 2, tailY + 3);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 발톱 (적만의 특징)
+        ctx.strokeStyle = "#FFF";
+        ctx.lineWidth = 1;
+        
+        // 앞발 발톱
+        for (let i = 0; i < 2; i++) {
+            const clawX = centerX + (i === 0 ? -4 : 4);
+            const clawY = centerY + 12 + bounceY;
+            ctx.beginPath();
+            ctx.moveTo(clawX, clawY);
+            ctx.lineTo(clawX, clawY + 2);
+            ctx.stroke();
+        }
+        
+        // 몬스터 타입별 특수 표시
+        this.drawMonsterTypeIndicator(ctx, centerX, centerY + bounceY);
+        
+        ctx.restore();
+    }
+    
+    drawMonsterTypeIndicator(ctx, centerX, centerY) {
+        // 몬스터 타입에 따른 특수 표시
+        ctx.font = "12px monospace";
+        ctx.textAlign = "center";
+        
+        switch (this.type) {
+            case "슬라임":
+                ctx.fillStyle = "#00FF00";
+                ctx.fillText("💧", centerX, centerY - 25);
+                break;
+            case "아기버그":
+                ctx.fillStyle = "#8B4513";
+                ctx.fillText("🐛", centerX, centerY - 25);
+                break;
+            case "고블린 전사":
+                ctx.fillStyle = "#FF4500";
+                ctx.fillText("⚔️", centerX, centerY - 25);
+                break;
+            case "고블린 궁수":
+                ctx.fillStyle = "#32CD32";
+                ctx.fillText("🏹", centerX, centerY - 25);
+                break;
+            case "얼음 늑대":
+                ctx.fillStyle = "#87CEEB";
+                ctx.fillText("❄️", centerX, centerY - 25);
+                break;
+            case "아이스 고스트":
+                ctx.fillStyle = "#B0C4DE";
+                ctx.fillText("👻", centerX, centerY - 25);
+                break;
+        }
     }
     
     getMonsterColor() {

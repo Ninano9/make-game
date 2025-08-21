@@ -64,6 +64,7 @@ class Game {
         // 키보드 이벤트
         document.addEventListener('keydown', (e) => {
             this.keys[e.key] = true;
+            this.keys[e.key.toLowerCase()] = true; // 소문자 버전도 저장
             
             // UI가 키를 처리했으면 게임 로직은 실행하지 않음
             if (this.ui && this.ui.handleKeyPress(e.key)) {
@@ -81,6 +82,7 @@ class Game {
         
         document.addEventListener('keyup', (e) => {
             this.keys[e.key] = false;
+            this.keys[e.key.toLowerCase()] = false; // 소문자 버전도 해제
         });
         
         // 창 포커스 이벤트
@@ -138,7 +140,16 @@ class Game {
         document.getElementById('startScreen').style.display = 'none';
         
         // 플레이어 생성
+        console.log(`플레이어 생성 시작: ${playerClass}`);
+        console.log("Player 클래스:", Player);
+        console.log("Player.prototype:", Player.prototype);
+        console.log("Player.prototype.attack:", Player.prototype.attack);
+        
         this.player = new Player(playerClass);
+        console.log("플레이어 생성 완료:", this.player);
+        console.log("플레이어 attack 메서드:", typeof this.player.attack);
+        console.log("플레이어 프로토타입:", Object.getPrototypeOf(this.player));
+        console.log("플레이어의 모든 메서드:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.player)));
         
         // 게임 상태 설정
         this.gameState = "playing";
@@ -177,30 +188,59 @@ class Game {
     }
     
     handleGameKeyDown(key) {
+        // 키를 소문자로 변환 (대소문자 구분 없이)
+        const normalizedKey = key.toLowerCase();
+        
         // 키 중복 입력 방지 (일부 키는 제외)
         const now = Date.now();
-        if (this.lastKeyPress[key] && now - this.lastKeyPress[key] < 100) {
-            if (!['ArrowLeft', 'ArrowRight', ' '].includes(key)) {
+        if (this.lastKeyPress[normalizedKey] && now - this.lastKeyPress[normalizedKey] < 100) {
+            if (!['arrowleft', 'arrowright', ' '].includes(normalizedKey)) {
                 return;
             }
         }
-        this.lastKeyPress[key] = now;
+        this.lastKeyPress[normalizedKey] = now;
         
-        switch (key) {
+        // 플레이어 객체와 메서드 존재 확인
+        if (!this.player) {
+            console.error("플레이어 객체가 존재하지 않습니다!");
+            return;
+        }
+
+        switch (normalizedKey) {
             case KEY_BINDINGS.기본공격:
-                this.player.attack();
+                if (typeof this.player.attack === 'function') {
+                    this.player.attack();
+                } else {
+                    console.error("player.attack 메서드가 존재하지 않습니다!", this.player);
+                }
                 break;
             case KEY_BINDINGS.스킬1:
-                this.player.useSkill(0);
+                if (typeof this.player.useSkill === 'function') {
+                    this.player.useSkill(0);
+                } else {
+                    console.error("player.useSkill 메서드가 존재하지 않습니다!");
+                }
                 break;
             case KEY_BINDINGS.스킬2:
-                this.player.useSkill(1);
+                if (typeof this.player.useSkill === 'function') {
+                    this.player.useSkill(1);
+                } else {
+                    console.error("player.useSkill 메서드가 존재하지 않습니다!");
+                }
                 break;
             case KEY_BINDINGS.스킬3:
-                this.player.useSkill(2);
+                if (typeof this.player.useSkill === 'function') {
+                    this.player.useSkill(2);
+                } else {
+                    console.error("player.useSkill 메서드가 존재하지 않습니다!");
+                }
                 break;
             case KEY_BINDINGS.점프:
-                this.player.jump();
+                if (typeof this.player.jump === 'function') {
+                    this.player.jump();
+                } else {
+                    console.error("player.jump 메서드가 존재하지 않습니다!");
+                }
                 break;
         }
     }
@@ -284,12 +324,12 @@ class Game {
     handleInput() {
         if (!this.player || this.ui.isMenuOpen) return;
         
-        // 이동 입력
+        // 이동 입력 (대소문자 구분 없이)
         let moveDirection = 0;
-        if (this.keys[KEY_BINDINGS.이동좌] || this.keys['ArrowLeft']) {
+        if (this.keys[KEY_BINDINGS.이동좌] || this.keys['ArrowLeft'] || this.keys['arrowleft']) {
             moveDirection -= 1;
         }
-        if (this.keys[KEY_BINDINGS.이동우] || this.keys['ArrowRight']) {
+        if (this.keys[KEY_BINDINGS.이동우] || this.keys['ArrowRight'] || this.keys['arrowright']) {
             moveDirection += 1;
         }
         

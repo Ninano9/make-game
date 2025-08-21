@@ -468,6 +468,12 @@ class Effect {
             case "spark":
                 this.drawSpark(ctx);
                 break;
+            case "slash":
+                this.drawSlash(ctx);
+                break;
+            case "sparkle":
+                this.drawSparkle(ctx);
+                break;
         }
         
         ctx.restore();
@@ -526,6 +532,40 @@ class Effect {
             ctx.lineTo(Math.cos(angle) * 12, Math.sin(angle) * 12);
             ctx.stroke();
         }
+    }
+    
+    drawSlash(ctx) {
+        // 검 휘두르기 효과
+        ctx.strokeStyle = "#CCCCCC";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        
+        // 호 모양의 검 궤적
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, -Math.PI/4, Math.PI/4);
+        ctx.stroke();
+        
+        // 내부 빛나는 효과
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, -Math.PI/4, Math.PI/4);
+        ctx.stroke();
+    }
+    
+    drawSparkle(ctx) {
+        // 반짝이는 입자 효과
+        ctx.fillStyle = "#FFFF99";
+        
+        // 십자 모양 반짝임
+        ctx.fillRect(-6, -1, 12, 2);
+        ctx.fillRect(-1, -6, 2, 12);
+        
+        // 중앙 밝은 점
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(0, 0, 2, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
