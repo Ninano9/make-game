@@ -1,0 +1,16 @@
+{
+  "name": "auto-chess-backend",
+  "version": "0.1.0",
+  "description": "간단한 10라운드 PvE 오토체스 백엔드 (Render 배포용)",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "NODE_ENV=development node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
+

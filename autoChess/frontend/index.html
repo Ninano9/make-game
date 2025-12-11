@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoChess PvE (10라운드)</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>AutoChess 10라운드 PvE</h1>
+        <p class="subtitle">유닛 30개 · 시너지 10개 · AI 10라운드</p>
+      </div>
+      <div class="cta">
+        <button id="simulate-btn" class="primary">시뮬레이션 실행</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>유닛 선택 (최대 8)</h2>
+          <div id="config-status" class="tag">로딩 중...</div>
+        </div>
+        <div id="unit-list" class="grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>내 조합</h2>
+          <span class="tag" id="selected-count">0 / 8</span>
+        </div>
+        <ul id="selected-list" class="selected"></ul>
+        <div class="synergy">
+          <h3>시너지 요약</h3>
+          <div id="synergy-summary" class="synergy-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>라운드 결과 (10)</h2>
+          <div class="legend">
+            <span class="pill win">승</span>
+            <span class="pill lose">패</span>
+            <span class="pill draw">무</span>
+          </div>
+        </div>
+        <div id="results" class="results"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>백엔드: <code>/api/config</code>, <code>/api/battle</code> (포트 4000 기본)</p>
+      <p>렌더 배포 시 백엔드/프론트 동일 도메인으로 설정하면 CORS 없이 동작합니다.</p>
+    </footer>
+
+    <script type="module" src="./script.js"></script>
+  </body>
+</html>
+
