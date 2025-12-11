@@ -128,7 +128,8 @@ function simulateRound(playerUnits, enemyUnits) {
 export function simulateCampaign(playerUnits) {
   const rounds = aiComps.slice(0, 10);
   const results = rounds.map((r) => {
-    const outcome = simulateRound(playerUnits, r.units.map((id) => ({ id, star: 2 })));
+    const enemy = r.units.map((u) => ({ id: u.id, star: u.star || 2 }));
+    const outcome = simulateRound(playerUnits, enemy);
     return { round: r.round, name: r.name, ...outcome };
   });
   const wins = results.filter((r) => r.winner === 'player').length;
@@ -140,7 +141,8 @@ export function getConfig() {
   return {
     units,
     synergies,
-    rounds: aiComps.length
+    rounds: aiComps.length,
+    aiComps
   };
 }
 
