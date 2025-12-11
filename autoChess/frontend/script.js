@@ -9,6 +9,49 @@ const BENCH_MAX = 15;
 const SHOP_SIZE = 5;
 const REROLL_COST = 2;
 
+// 간단한 유닛별 스킬 설정
+// type: 'splash' | 'pierce' | 'heal'
+// mult: AP 배수
+// radius: splash 타겟 수 또는 효과 크기
+// color: 이펙트 색상
+const skillConfigs = {
+  // 1코
+  u1: { type: 'pierce', mult: 1.2, radius: 1, color: '#38bdf8' },
+  u2: { type: 'heal', mult: 0.6, radius: 2, color: '#22c55e' },
+  u3: { type: 'pierce', mult: 1.5, radius: 2, color: '#fbbf24' },
+  u4: { type: 'pierce', mult: 1.4, radius: 1, color: '#f472b6' },
+  u5: { type: 'splash', mult: 1.0, radius: 2, color: '#fb7185' },
+  // 2코
+  u6: { type: 'splash', mult: 1.3, radius: 2, color: '#a855f7' },
+  u7: { type: 'splash', mult: 1.5, radius: 3, color: '#60a5fa' },
+  u8: { type: 'heal', mult: 0.8, radius: 3, color: '#34d399' },
+  u9: { type: 'heal', mult: 1.0, radius: 2, color: '#22c55e' },
+  u10:{ type: 'pierce', mult: 1.4, radius: 2, color: '#fcd34d' },
+  u11:{ type: 'pierce', mult: 1.6, radius: 1, color: '#fb7185' },
+  // 3코
+  u12:{ type: 'pierce', mult: 1.7, radius: 2, color: '#fbbf24' },
+  u13:{ type: 'splash', mult: 1.8, radius: 3, color: '#22d3ee' },
+  u14:{ type: 'pierce', mult: 1.6, radius: 2, color: '#38bdf8' },
+  u15:{ type: 'heal', mult: 1.2, radius: 3, color: '#4ade80' },
+  u16:{ type: 'splash', mult: 1.5, radius: 2, color: '#fb923c' },
+  u17:{ type: 'splash', mult: 1.7, radius: 3, color: '#818cf8' },
+  u18:{ type: 'pierce', mult: 1.5, radius: 2, color: '#c084fc' },
+  // 4코
+  u19:{ type: 'heal', mult: 1.3, radius: 3, color: '#22c55e' },
+  u20:{ type: 'pierce', mult: 1.9, radius: 2, color: '#fcd34d' },
+  u21:{ type: 'splash', mult: 2.0, radius: 3, color: '#60a5fa' },
+  u22:{ type: 'splash', mult: 1.7, radius: 2, color: '#f97316' },
+  u23:{ type: 'heal', mult: 1.6, radius: 3, color: '#a78bfa' },
+  u24:{ type: 'pierce', mult: 1.8, radius: 2, color: '#f9a8d4' },
+  u25:{ type: 'pierce', mult: 1.8, radius: 2, color: '#ec4899' },
+  u26:{ type: 'splash', mult: 1.7, radius: 2, color: '#38bdf8' },
+  // 5코
+  u27:{ type: 'pierce', mult: 2.2, radius: 3, color: '#c084fc' },
+  u28:{ type: 'heal', mult: 1.9, radius: 4, color: '#34d399' },
+  u29:{ type: 'splash', mult: 2.1, radius: 3, color: '#22d3ee' },
+  u30:{ type: 'heal', mult: 1.7, radius: 3, color: '#6ee7b7' }
+};
+
 let units = [];
 let synergies = [];
 let aiComps = [];
@@ -443,26 +486,49 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
           // 스킬 사용 조건
           if (u.mana >= u.manaMax) {
             u.mana = 0;
-            const splashTargets = (u.side === 'player' ? enemies : players)
-              .slice(0, 2); // 간단히 2명 타격
-            splashTargets.forEach((st) => {
-              const sdmg = Math.max(12, Math.round(u.stats.abilityPower * 1.4));
-              st.hp -= sdmg;
-              st.mana = Math.min(st.manaMax, st.mana + st.manaOnDamaged);
-              events.push({
-                type: 'spell',
-                from: { x: u.x, y: u.y, side: u.side, id: u.id },
-                to: { x: st.x, y: st.y, side: st.side, id: st.id },
-                dmg: sdmg,
-                targetHp: Math.max(0, st.hp)
-              });
+            const cfg = skillConfigs[u.id] || { type: 'splash', mult: 1.4, radius: 2, color: '#38bdf8' };
+            const opp = u.side === 'player' ? enemies : players;
+            const sorted = opp
+              .map((o) => ({ o, d: manhattan(u, o) }))
+              .sort((a, b) => a.d - b.d);
+            const targets = sorted.slice(0, Math.max(1, cfg.radius)).map((t) => t.o);
+            targets.forEach((st) => {
+              let sdmg = Math.max(10, Math.round(u.stats.abilityPower * cfg.mult));
+              if (cfg.type === 'heal') {
+                // 힐이면 아군 대상
+                const allies = (u.side === 'player' ? players : enemies)
+                  .map((o) => ({ o, d: manhattan(u, o) }))
+                  .sort((a, b) => a.o.hp - b.o.hp);
+                const healTargets = allies.slice(0, Math.max(1, cfg.radius)).map((t) => t.o);
+                healTargets.forEach((ally) => {
+                  ally.hp = Math.min(ally.stats.hp, ally.hp + sdmg);
+                  events.push({
+                    type: 'spell',
+                    spellType: 'heal',
+                    color: cfg.color,
+                    from: { x: u.x, y: u.y, side: u.side, id: u.id },
+                    to: { x: ally.x, y: ally.y, side: ally.side, id: ally.id },
+                    dmg: -sdmg,
+                    targetHp: Math.max(0, ally.hp)
+                  });
+                });
+              } else {
+                st.hp -= sdmg;
+                st.mana = Math.min(st.manaMax, st.mana + st.manaOnDamaged);
+                events.push({
+                  type: 'spell',
+                  spellType: cfg.type,
+                  color: cfg.color,
+                  from: { x: u.x, y: u.y, side: u.side, id: u.id },
+                  to: { x: st.x, y: st.y, side: st.side, id: st.id },
+                  dmg: sdmg,
+                  targetHp: Math.max(0, st.hp)
+                });
+              }
             });
             // 죽은 처리
-            if ((u.side === 'player' ? enemies : players) === enemies) {
-              enemies = enemies.filter((e) => e.hp > 0);
-            } else {
-              players = players.filter((p) => p.hp > 0);
-            }
+            enemies = enemies.filter((e) => e.hp > 0);
+            players = players.filter((p) => p.hp > 0);
           }
           if (target.hp <= 0) {
             if (target.side === 'player') {
@@ -721,12 +787,16 @@ function playFx() {
       const midx = from.cx + (to.cx - from.cx) * progress;
       const midy = from.cy + (to.cy - from.cy) * progress;
       const radius = 10 + 24 * progress;
-      ctx.strokeStyle = ev.from.side === 'player' ? '#38bdf8' : '#c084fc';
+      const color = ev.color || (ev.from.side === 'player' ? '#38bdf8' : '#c084fc');
+      ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(midx, midy, radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = ev.from.side === 'player' ? 'rgba(56,189,248,0.25)' : 'rgba(192,132,252,0.25)';
+      // 간단 변환: hex 기반이면 플레이어/적 구분 색상 사용
+      ctx.fillStyle = ev.from.side === 'player'
+        ? 'rgba(56,189,248,0.25)'
+        : 'rgba(192,132,252,0.25)';
       ctx.beginPath();
       ctx.arc(midx, midy, radius * 0.7, 0, Math.PI * 2);
       ctx.fill();
