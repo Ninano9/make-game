@@ -68,6 +68,7 @@ async function fetchConfig() {
     renderSynergySummary();
     renderHud();
     configStatusEl.textContent = `유닛 ${units.length} · 시너지 ${synergies.length} · AI ${aiComps.length}`;
+    rollShop();
   } catch (e) {
     console.error(e);
     configStatusEl.textContent = '로딩 실패';
@@ -115,11 +116,11 @@ function renderBench() {
         <div class="muted mini">${'★'.repeat(u.star)} · 코스트 ${base.cost}</div>
       </div>
       <div style="display:flex;gap:4px;">
-        <button class="btn" aria-label="remove">삭제</button>
+        <button class="btn" aria-label="sell">판매</button>
       </div>
     `;
-    const [remove] = div.querySelectorAll('button');
-    remove.addEventListener('click', (ev) => { ev.stopPropagation(); removeBench(i); });
+    const [sell] = div.querySelectorAll('button');
+    sell.addEventListener('click', (ev) => { ev.stopPropagation(); sellBench(i); });
     div.addEventListener('click', () => {
       selectedBench = selectedBench === i ? -1 : i;
       renderBench();
@@ -128,10 +129,16 @@ function renderBench() {
   });
 }
 
-function removeBench(idx) {
+function sellBench(idx) {
+  const u = bench[idx];
+  const base = units.find((b) => b.id === u.id);
+  const cost = base?.cost || 1;
+  const price = cost * Math.pow(3, (u.star || 1) - 1);
+  gold += price;
   bench.splice(idx, 1);
   if (selectedBench === idx) selectedBench = -1;
   renderBench();
+  renderHud();
 }
 
 function renderBoards() {
@@ -336,7 +343,7 @@ function resetGame() {
   renderShop();
 }
 
-function prepareTeam(teamUnits, bonus, side) {
+function prepareTeam(teamUnits, bonus, side, scale = 1) {
   return teamUnits.map((u) => {
     const base = units.find((b) => b.id === u.id);
     if (!base) return null;
@@ -344,12 +351,14 @@ function prepareTeam(teamUnits, bonus, side) {
     const mult = 1 + 0.6 * (star - 1);
     const stats = {
       ...base.stats,
-      hp: Math.round((base.stats.hp * mult + bonus.healthFlat) * (1 + bonus.healthMult) + bonus.shield),
-      attack: Math.round(base.stats.attack * mult * (1 + bonus.attackMult)),
+      hp: Math.round(((base.stats.hp * mult * scale) + bonus.healthFlat) * (1 + bonus.healthMult) + bonus.shield),
+      attack: Math.round(base.stats.attack * mult * scale * (1 + bonus.attackMult)),
       attackSpeed: base.stats.attackSpeed * (1 + bonus.attackSpeedMult),
       armor: base.stats.armor + bonus.armorBonus,
-      magicResist: base.stats.magicResist + bonus.magicResistBonus
+      magicResist: base.stats.magicResist + bonus.magicResistBonus,
+      abilityPower: Math.round(base.stats.abilityPower * mult * scale)
     };
+    const manaMax = 80 + Math.round(stats.abilityPower * 0.4);
     return {
       uid: uid(),
       id: u.id,
@@ -359,7 +368,12 @@ function prepareTeam(teamUnits, bonus, side) {
       y: u.y,
       stats,
       hp: stats.hp,
-      cd: 0
+      cd: 0,
+      mana: 0,
+      manaMax,
+      manaRegen: 6, // 초당 마나 재생
+      manaOnHit: 12,
+      manaOnDamaged: 10
     };
   }).filter(Boolean);
 }
@@ -381,12 +395,13 @@ function pickTarget(unit, enemies) {
   return best;
 }
 
-function simulateBattle(playerBoardUnits, enemyBoardUnits) {
+function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
   const playerBonus = computeSynergyBonus(playerBoardUnits).bonus;
   const enemyBonus = computeSynergyBonus(enemyBoardUnits).bonus;
 
-  let players = prepareTeam(playerBoardUnits, playerBonus, 'player');
-  let enemies = prepareTeam(enemyBoardUnits, enemyBonus, 'enemy');
+  const enemyScale = 1 + roundIdx * 0.12; // 라운드가 갈수록 강해짐
+  let players = prepareTeam(playerBoardUnits, playerBonus, 'player', 1);
+  let enemies = prepareTeam(enemyBoardUnits, enemyBonus, 'enemy', enemyScale);
 
   const step = 0.35; // seconds
   const maxTime = 45; // seconds
@@ -396,13 +411,18 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
   while (players.length && enemies.length && t < maxTime) {
     const all = [...players, ...enemies];
     all.forEach((u) => {
+      // 지속 마나 회복
+      u.mana = Math.min(u.manaMax, u.mana + u.manaRegen * step);
       u.cd -= step;
       if (u.cd <= 0) {
         const targets = u.side === 'player' ? enemies : players;
         const target = pickTarget(u, targets);
         if (target) {
+          // 기본 공격
           const dmg = Math.max(8, u.stats.attack);
           target.hp -= dmg;
+          u.mana = Math.min(u.manaMax, u.mana + u.manaOnHit);
+          target.mana = Math.min(target.manaMax, target.mana + target.manaOnDamaged);
           events.push({
             type: 'attack',
             from: { x: u.x, y: u.y, side: u.side, id: u.id },
@@ -410,6 +430,30 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
             dmg,
             targetHp: Math.max(0, target.hp)
           });
+          // 스킬 사용 조건
+          if (u.mana >= u.manaMax) {
+            u.mana = 0;
+            const splashTargets = (u.side === 'player' ? enemies : players)
+              .slice(0, 2); // 간단히 2명 타격
+            splashTargets.forEach((st) => {
+              const sdmg = Math.max(12, Math.round(u.stats.abilityPower * 1.4));
+              st.hp -= sdmg;
+              st.mana = Math.min(st.manaMax, st.mana + st.manaOnDamaged);
+              events.push({
+                type: 'spell',
+                from: { x: u.x, y: u.y, side: u.side, id: u.id },
+                to: { x: st.x, y: st.y, side: st.side, id: st.id },
+                dmg: sdmg,
+                targetHp: Math.max(0, st.hp)
+              });
+            });
+            // 죽은 처리
+            if ((u.side === 'player' ? enemies : players) === enemies) {
+              enemies = enemies.filter((e) => e.hp > 0);
+            } else {
+              players = players.filter((p) => p.hp > 0);
+            }
+          }
           if (target.hp <= 0) {
             if (target.side === 'player') {
               players = players.filter((p) => p.uid !== target.uid);
@@ -445,6 +489,7 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
 
 function rollShop() {
   if (shopLocked && shop.length) return;
+  if (!units.length) return;
   shop = [];
   for (let i = 0; i < SHOP_SIZE; i++) {
     const pick = units[Math.floor(Math.random() * units.length)];
@@ -544,7 +589,7 @@ function startRound() {
   ];
   isFighting = true;
   startBtn.disabled = true;
-  const result = simulateBattle(playerUnits, enemyUnits);
+  const result = simulateBattle(playerUnits, enemyUnits, roundIndex);
   fxEvents = result.events;
   playFx();
   if (result.winner === 'enemy') hearts = Math.max(0, hearts - 1);
@@ -562,7 +607,9 @@ function startRound() {
   renderHud();
   roundIndex = Math.min(9, roundIndex + 1);
   renderBoards();
-  if (!shopLocked) rollShop();
+  shopLocked = false;
+  lockBtn.textContent = '고정';
+  rollShop(); // 라운드 종료 자동 새로고침 (무료)
   isFighting = false;
   startBtn.disabled = false;
   if (hearts === 0) {
@@ -625,6 +672,21 @@ function playFx() {
       ctx.beginPath();
       ctx.arc(cx, cy, 6, 0, Math.PI * 2);
       ctx.fill();
+    } else if (ev.type === 'spell') {
+      const from = cellCenter(ev.from.x, ev.from.y);
+      const to = cellCenter(ev.to.x, ev.to.y);
+      const midx = from.cx + (to.cx - from.cx) * progress;
+      const midy = from.cy + (to.cy - from.cy) * progress;
+      const radius = 10 + 24 * progress;
+      ctx.strokeStyle = ev.from.side === 'player' ? '#38bdf8' : '#c084fc';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(midx, midy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = ev.from.side === 'player' ? 'rgba(56,189,248,0.25)' : 'rgba(192,132,252,0.25)';
+      ctx.beginPath();
+      ctx.arc(midx, midy, radius * 0.7, 0, Math.PI * 2);
+      ctx.fill();
     } else if (ev.type === 'death') {
       const { cx, cy } = cellCenter(ev.at.x, ev.at.y);
       const r = 6 + 18 * progress;
@@ -666,5 +728,4 @@ fetchConfig();
 renderHud();
 renderBoards();
 renderSynergySummary();
-rollShop();
 
