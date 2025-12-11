@@ -1,6 +1,7 @@
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+// Render 등 별도 도메인에서 백엔드를 호출할 때 절대 경로 사용
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:4000'
-  : '';
+  : 'https://backend-lj9h.onrender.com';
 
 let units = [];
 let synergies = [];
