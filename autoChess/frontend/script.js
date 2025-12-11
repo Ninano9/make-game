@@ -24,6 +24,7 @@ let shopLocked = false;
 let isFighting = false;
 let logEntries = [];
 let fxEvents = [];
+let fxUnits = [];
 
 const unitListEl = document.getElementById('unit-list');
 const benchEl = document.getElementById('bench');
@@ -85,9 +86,8 @@ function renderUnits() {
       </div>
       <div class="traits">${u.traits.map((t) => `<span class="pill">${getSynergyName(t)}</span>`).join('')}</div>
       <div class="muted">HP ${u.stats.hp} · ATK ${u.stats.attack} · ASPD ${u.stats.attackSpeed}</div>
-      <button class="btn" data-id="${u.id}">벤치 추가</button>
+      <div class="muted mini">구매는 상점에서만 가능합니다.</div>
     `;
-    card.querySelector('button').addEventListener('click', () => addToBench(u.id));
     unitListEl.appendChild(card);
   });
 }
@@ -115,13 +115,11 @@ function renderBench() {
         <div class="muted mini">${'★'.repeat(u.star)} · 코스트 ${base.cost}</div>
       </div>
       <div style="display:flex;gap:4px;">
-        <button class="btn" aria-label="star down">-</button>
-        <button class="btn" aria-label="star up">+</button>
+        <button class="btn" aria-label="remove">삭제</button>
       </div>
     `;
-    const [down, up] = div.querySelectorAll('button');
-    down.addEventListener('click', (ev) => { ev.stopPropagation(); changeBenchStar(i, -1); });
-    up.addEventListener('click', (ev) => { ev.stopPropagation(); changeBenchStar(i, 1); });
+    const [remove] = div.querySelectorAll('button');
+    remove.addEventListener('click', (ev) => { ev.stopPropagation(); removeBench(i); });
     div.addEventListener('click', () => {
       selectedBench = selectedBench === i ? -1 : i;
       renderBench();
@@ -130,8 +128,9 @@ function renderBench() {
   });
 }
 
-function changeBenchStar(idx, delta) {
-  bench[idx].star = Math.min(3, Math.max(1, bench[idx].star + delta));
+function removeBench(idx) {
+  bench.splice(idx, 1);
+  if (selectedBench === idx) selectedBench = -1;
   renderBench();
 }
 
@@ -177,6 +176,7 @@ function onCellClick(x, y) {
     const picked = bench.splice(selectedBench, 1)[0];
     board[y][x] = picked;
     selectedBench = -1;
+    tryCombine(picked.id);
   } else if (board[y][x]) {
     if (bench.length >= BENCH_MAX) {
       alert('벤치가 가득 차서 회수할 수 없습니다.');
@@ -198,6 +198,57 @@ function currentBoardUnits() {
     }
   }
   return arr;
+}
+
+function collectUnits(id, star) {
+  const refs = [];
+  bench.forEach((u, i) => { if (u.id === id && u.star === star) refs.push({ source: 'bench', i }); });
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      const u = board[y][x];
+      if (u && u.id === id && u.star === star) refs.push({ source: 'board', x, y });
+    }
+  }
+  return refs;
+}
+
+function applyUpgrade(ref, newStar) {
+  if (ref.source === 'bench') {
+    bench[ref.i].star = newStar;
+  } else {
+    board[ref.y][ref.x].star = newStar;
+  }
+}
+
+function removeRef(ref) {
+  if (ref.source === 'bench') {
+    bench.splice(ref.i, 1);
+  } else {
+    board[ref.y][ref.x] = null;
+  }
+}
+
+function tryCombine(id) {
+  for (let star = 1; star <= 2; star++) {
+    while (true) {
+      const refs = collectUnits(id, star);
+      if (refs.length < 3) break;
+      const keep = refs[0];
+      const toRemove = refs.slice(1, 3);
+      // remove in safe order: bench high index first
+      toRemove.sort((a, b) => {
+        if (a.source === 'bench' && b.source === 'bench') return b.i - a.i;
+        if (a.source === 'bench') return 1;
+        if (b.source === 'bench') return -1;
+        return 0;
+      });
+      toRemove.forEach(removeRef);
+      applyUpgrade(keep, star + 1);
+    }
+  }
+  renderBench();
+  renderBoards();
+  renderSynergySummary();
 }
 
 function computeSynergyBonus(teamUnits) {
@@ -352,7 +403,13 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
         if (target) {
           const dmg = Math.max(8, u.stats.attack);
           target.hp -= dmg;
-          events.push({ type: 'attack', from: { x: u.x, y: u.y, side: u.side }, to: { x: target.x, y: target.y, side: target.side }, dmg });
+          events.push({
+            type: 'attack',
+            from: { x: u.x, y: u.y, side: u.side, id: u.id },
+            to: { x: target.x, y: target.y, side: target.side, id: target.id },
+            dmg,
+            targetHp: Math.max(0, target.hp)
+          });
           if (target.hp <= 0) {
             if (target.side === 'player') {
               players = players.filter((p) => p.uid !== target.uid);
@@ -409,6 +466,7 @@ function buyFromShop(slot) {
   }
   gold -= item.cost;
   bench.push({ uid: uid(), id: item.id, star: 1 });
+  tryCombine(item.id);
   shop = shop.filter((s) => s.slot !== slot);
   renderShop();
   renderBench();
@@ -480,13 +538,17 @@ function startRound() {
     return;
   }
   const enemyUnits = (aiComps[roundIndex]?.units || []).map((u) => ({ ...u }));
+  fxUnits = [
+    ...playerUnits.map((u) => ({ ...u, side: 'player', hp: (units.find((b) => b.id === u.id)?.stats.hp || 1) })),
+    ...enemyUnits.map((u) => ({ ...u, side: 'enemy', hp: (units.find((b) => b.id === u.id)?.stats.hp || 1) }))
+  ];
   isFighting = true;
   startBtn.disabled = true;
   const result = simulateBattle(playerUnits, enemyUnits);
   fxEvents = result.events;
   playFx();
   if (result.winner === 'enemy') hearts = Math.max(0, hearts - 1);
-  else gainIncome(true);
+  gainIncome(result.winner === 'player');
   logEntries.push({
     round: roundIndex + 1,
     name: aiComps[roundIndex]?.name || '',
@@ -524,35 +586,80 @@ function playFx() {
   fxCanvas.width = fxCanvas.clientWidth;
   fxCanvas.height = fxCanvas.clientHeight;
   let i = 0;
-  const tick = () => {
+  let start = null;
+  const duration = 320;
+
+  const drawUnits = () => {
+    fxUnits.forEach((u) => {
+      const { cx, cy } = cellCenter(u.x, u.y);
+      const color = u.side === 'player' ? '#22d3ee' : '#a855f7';
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+      ctx.fill();
+      // HP bar
+      const ratio = Math.max(0, Math.min(1, u.hp / (units.find((b) => b.id === u.id)?.stats.hp || u.hp || 1)));
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(cx - 16, cy + 14, 32, 5);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(cx - 16, cy + 14, 32 * ratio, 5);
+    });
+  };
+
+  const drawEvent = (ev, progress) => {
     ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-    const ev = fxEvents[i];
-    if (ev) {
-      if (ev.type === 'attack') {
-        const from = cellCenter(ev.from.x, ev.from.y);
-        const to = cellCenter(ev.to.x, ev.to.y);
-        ctx.strokeStyle = ev.from.side === 'player' ? '#22d3ee' : '#a855f7';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(from.cx, from.cy);
-        ctx.lineTo(to.cx, to.cy);
-        ctx.stroke();
-      } else if (ev.type === 'death') {
-        const { cx, cy } = cellCenter(ev.at.x, ev.at.y);
-        ctx.fillStyle = 'rgba(239,68,68,0.4)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    i++;
-    if (i < fxEvents.length) {
-      requestAnimationFrame(tick);
-    } else {
-      setTimeout(() => ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height), 200);
+    drawUnits();
+    if (!ev) return;
+    if (ev.type === 'attack') {
+      const from = cellCenter(ev.from.x, ev.from.y);
+      const to = cellCenter(ev.to.x, ev.to.y);
+      const cx = from.cx + (to.cx - from.cx) * progress;
+      const cy = from.cy + (to.cy - from.cy) * progress;
+      ctx.strokeStyle = ev.from.side === 'player' ? '#22d3ee' : '#a855f7';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(from.cx, from.cy);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.fillStyle = ev.from.side === 'player' ? '#22d3ee' : '#a855f7';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (ev.type === 'death') {
+      const { cx, cy } = cellCenter(ev.at.x, ev.at.y);
+      const r = 6 + 18 * progress;
+      ctx.fillStyle = 'rgba(239,68,68,0.35)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
     }
   };
-  requestAnimationFrame(tick);
+
+  const step = (ts) => {
+    if (!start) start = ts;
+    const ev = fxEvents[i];
+    const progress = Math.min(1, (ts - start) / duration);
+    drawEvent(ev, progress);
+    if (progress >= 1) {
+      if (ev && ev.type === 'attack') {
+        // apply HP update
+        const target = fxUnits.find((u) => u.x === ev.to.x && u.y === ev.to.y && u.side === ev.to.side);
+        if (target) {
+          target.hp = ev.targetHp;
+        }
+      } else if (ev && ev.type === 'death') {
+        fxUnits = fxUnits.filter((u) => !(u.x === ev.at.x && u.y === ev.at.y));
+      }
+      i++;
+      start = ts;
+      if (i >= fxEvents.length) {
+        setTimeout(() => ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height), 120);
+        return;
+      }
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 fetchConfig();
