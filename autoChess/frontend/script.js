@@ -5,7 +5,7 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 
 const BOARD_ROWS = 4;
 const BOARD_COLS = 7;
-const BENCH_MAX = 8;
+const BENCH_MAX = 15;
 const SHOP_SIZE = 5;
 const REROLL_COST = 2;
 
@@ -105,8 +105,14 @@ function addToBench(id) {
 function renderBench() {
   benchCountEl.textContent = `${bench.length} / ${BENCH_MAX}`;
   benchEl.innerHTML = '';
-  bench.forEach((u, i) => {
-    const base = units.find((x) => x.id === u.id);
+  const sorted = bench
+    .map((u, i) => {
+      const base = units.find((x) => x.id === u.id);
+      return { u, i, base, name: base?.name || u.id };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  sorted.forEach(({ u, i, base }) => {
     if (!base) return;
     const div = document.createElement('div');
     div.className = `bench-card ${selectedBench === i ? 'active' : ''}`;
@@ -143,7 +149,7 @@ function sellBench(idx) {
 
 function renderBoards() {
   renderBoard(playerBoardEl, board, true);
-  const enemyUnits = (aiComps[roundIndex]?.units || []).map((u) => ({ ...u }));
+  const enemyUnits = mirrorEnemyUnits((aiComps[roundIndex]?.units || []).map((u) => ({ ...u })));
   const enemyBoard = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(null));
   enemyUnits.forEach((u) => {
     if (enemyBoard[u.y] && enemyBoard[u.y][u.x] === null) {
@@ -205,6 +211,10 @@ function currentBoardUnits() {
     }
   }
   return arr;
+}
+
+function mirrorEnemyUnits(unitsArr) {
+  return unitsArr.map((u) => ({ ...u, x: BOARD_COLS - 1 - u.x }));
 }
 
 function collectUnits(id, star) {
@@ -613,7 +623,8 @@ function startRound() {
     alert('보드에 최소 1개 이상의 유닛을 배치하세요.');
     return;
   }
-  const enemyUnits = (aiComps[roundIndex]?.units || []).map((u) => ({ ...u }));
+  const enemyUnitsRaw = (aiComps[roundIndex]?.units || []).map((u) => ({ ...u }));
+  const enemyUnits = mirrorEnemyUnits(enemyUnitsRaw);
   fxUnits = [
     ...playerUnits.map((u) => ({ ...u, side: 'player', hp: (units.find((b) => b.id === u.id)?.stats.hp || 1) })),
     ...enemyUnits.map((u) => ({ ...u, side: 'enemy', hp: (units.find((b) => b.id === u.id)?.stats.hp || 1) }))
@@ -622,30 +633,31 @@ function startRound() {
   startBtn.disabled = true;
   const result = simulateBattle(playerUnits, enemyUnits, roundIndex);
   fxEvents = result.events;
-  playFx();
-  if (result.winner === 'enemy') hearts = Math.max(0, hearts - 1);
-  gainIncome(result.winner === 'player');
-  logEntries.push({
-    round: roundIndex + 1,
-    name: aiComps[roundIndex]?.name || '',
-    winner: result.winner,
-    time: result.time,
-    players: result.players.length,
-    enemies: result.enemies.length,
-    hearts
+  playFx().then(() => {
+    if (result.winner === 'enemy') hearts = Math.max(0, hearts - 1);
+    gainIncome(result.winner === 'player');
+    logEntries.push({
+      round: roundIndex + 1,
+      name: aiComps[roundIndex]?.name || '',
+      winner: result.winner,
+      time: result.time,
+      players: result.players.length,
+      enemies: result.enemies.length,
+      hearts
+    });
+    renderLog();
+    renderHud();
+    roundIndex = Math.min(9, roundIndex + 1);
+    renderBoards();
+    shopLocked = false;
+    lockBtn.textContent = '고정';
+    rollShop(); // 라운드 종료 자동 새로고침 (무료)
+    isFighting = false;
+    startBtn.disabled = false;
+    if (hearts === 0) {
+      alert('패배! 리셋 후 다시 도전하세요.');
+    }
   });
-  renderLog();
-  renderHud();
-  roundIndex = Math.min(9, roundIndex + 1);
-  renderBoards();
-  shopLocked = false;
-  lockBtn.textContent = '고정';
-  rollShop(); // 라운드 종료 자동 새로고침 (무료)
-  isFighting = false;
-  startBtn.disabled = false;
-  if (hearts === 0) {
-    alert('패배! 리셋 후 다시 도전하세요.');
-  }
 }
 
 startBtn.addEventListener('click', startRound);
@@ -660,7 +672,7 @@ function cellCenter(x, y) {
 }
 
 function playFx() {
-  if (!ctx || !fxEvents.length) return;
+  if (!ctx || !fxEvents.length) return Promise.resolve();
   fxCanvas.width = fxCanvas.clientWidth;
   fxCanvas.height = fxCanvas.clientHeight;
   let i = 0;
@@ -728,31 +740,39 @@ function playFx() {
     }
   };
 
-  const step = (ts) => {
-    if (!start) start = ts;
-    const ev = fxEvents[i];
-    const progress = Math.min(1, (ts - start) / duration);
-    drawEvent(ev, progress);
-    if (progress >= 1) {
-      if (ev && ev.type === 'attack') {
-        // apply HP update
-        const target = fxUnits.find((u) => u.x === ev.to.x && u.y === ev.to.y && u.side === ev.to.side);
-        if (target) {
-          target.hp = ev.targetHp;
+  return new Promise((resolve) => {
+    const step = (ts) => {
+      if (!start) start = ts;
+      const ev = fxEvents[i];
+      const progress = Math.min(1, (ts - start) / duration);
+      drawEvent(ev, progress);
+      if (progress >= 1) {
+        if (ev && ev.type === 'attack') {
+          // apply HP update
+          const target = fxUnits.find((u) => u.x === ev.to.x && u.y === ev.to.y && u.side === ev.to.side);
+          if (target) {
+            target.hp = ev.targetHp;
+          }
+        } else if (ev && ev.type === 'spell') {
+          const target = fxUnits.find((u) => u.x === ev.to.x && u.y === ev.to.y && u.side === ev.to.side);
+          if (target) target.hp = ev.targetHp;
+        } else if (ev && ev.type === 'death') {
+          fxUnits = fxUnits.filter((u) => !(u.x === ev.at.x && u.y === ev.at.y));
         }
-      } else if (ev && ev.type === 'death') {
-        fxUnits = fxUnits.filter((u) => !(u.x === ev.at.x && u.y === ev.at.y));
+        i++;
+        start = ts;
+        if (i >= fxEvents.length) {
+          setTimeout(() => {
+            ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+            resolve();
+          }, 120);
+          return;
+        }
       }
-      i++;
-      start = ts;
-      if (i >= fxEvents.length) {
-        setTimeout(() => ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height), 120);
-        return;
-      }
-    }
+      requestAnimationFrame(step);
+    };
     requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  });
 }
 
 fetchConfig();

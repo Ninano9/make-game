@@ -3,48 +3,48 @@ export const aiComps = [
     round: 1,
     name: '기본 전위',
     units: [
-      { id: 'u1', star: 2, x: 2, y: 2 },
-      { id: 'u2', star: 2, x: 3, y: 2 },
-      { id: 'u3', star: 2, x: 4, y: 1 },
-      { id: 'u5', star: 2, x: 2, y: 1 },
-      { id: 'u9', star: 2, x: 3, y: 1 },
-      { id: 'u10', star: 2, x: 4, y: 2 }
+      { id: 'u1', star: 1, x: 2, y: 2 },
+      { id: 'u2', star: 1, x: 3, y: 2 },
+      { id: 'u3', star: 1, x: 4, y: 1 },
+      { id: 'u5', star: 1, x: 2, y: 1 },
+      { id: 'u9', star: 1, x: 3, y: 1 },
+      { id: 'u10', star: 1, x: 4, y: 2 }
     ]
   },
   {
     round: 2,
     name: '도적 기습',
     units: [
-      { id: 'u4', star: 2, x: 2, y: 2 },
-      { id: 'u6', star: 2, x: 4, y: 0 },
-      { id: 'u10', star: 2, x: 4, y: 2 },
-      { id: 'u11', star: 2, x: 3, y: 1 },
-      { id: 'u18', star: 2, x: 2, y: 1 },
-      { id: 'u26', star: 2, x: 3, y: 2 }
+      { id: 'u4', star: 1, x: 2, y: 2 },
+      { id: 'u6', star: 1, x: 4, y: 0 },
+      { id: 'u10', star: 1, x: 4, y: 2 },
+      { id: 'u11', star: 1, x: 3, y: 1 },
+      { id: 'u18', star: 1, x: 2, y: 1 },
+      { id: 'u26', star: 1, x: 3, y: 2 }
     ]
   },
   {
     round: 3,
     name: '저격 강화',
     units: [
-      { id: 'u3', star: 2, x: 3, y: 3 },
-      { id: 'u12', star: 2, x: 2, y: 3 },
-      { id: 'u20', star: 2, x: 4, y: 3 },
-      { id: 'u27', star: 2, x: 3, y: 2 },
-      { id: 'u10', star: 2, x: 2, y: 1 },
-      { id: 'u23', star: 2, x: 4, y: 2 }
+      { id: 'u3', star: 1, x: 3, y: 3 },
+      { id: 'u12', star: 1, x: 2, y: 3 },
+      { id: 'u20', star: 1, x: 4, y: 3 },
+      { id: 'u27', star: 1, x: 3, y: 2 },
+      { id: 'u10', star: 1, x: 2, y: 1 },
+      { id: 'u23', star: 1, x: 4, y: 2 }
     ]
   },
   {
     round: 4,
     name: '난동 수호',
     units: [
-      { id: 'u5', star: 2, x: 2, y: 2 },
-      { id: 'u16', star: 2, x: 3, y: 2 },
-      { id: 'u22', star: 2, x: 4, y: 2 },
-      { id: 'u8', star: 2, x: 2, y: 1 },
-      { id: 'u15', star: 2, x: 3, y: 1 },
-      { id: 'u19', star: 2, x: 4, y: 1 }
+      { id: 'u5', star: 1, x: 2, y: 2 },
+      { id: 'u16', star: 1, x: 3, y: 2 },
+      { id: 'u22', star: 1, x: 4, y: 2 },
+      { id: 'u8', star: 1, x: 2, y: 1 },
+      { id: 'u15', star: 1, x: 3, y: 1 },
+      { id: 'u19', star: 1, x: 4, y: 1 }
     ]
   },
   {
