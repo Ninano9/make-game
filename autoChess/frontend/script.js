@@ -6,6 +6,8 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 const BOARD_ROWS = 4;
 const BOARD_COLS = 7;
 const BENCH_MAX = 8;
+const SHOP_SIZE = 5;
+const REROLL_COST = 2;
 
 let units = [];
 let synergies = [];
@@ -16,8 +18,12 @@ let board = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(null
 let selectedBench = -1;
 let roundIndex = 0; // 0-based (10라운드)
 let hearts = 3;
+let gold = 10;
+let shop = [];
+let shopLocked = false;
 let isFighting = false;
 let logEntries = [];
+let fxEvents = [];
 
 const unitListEl = document.getElementById('unit-list');
 const benchEl = document.getElementById('bench');
@@ -31,6 +37,12 @@ const benchCountEl = document.getElementById('bench-count');
 const logEl = document.getElementById('log');
 const hudRoundEl = document.getElementById('hud-round');
 const hudHeartEl = document.getElementById('hud-heart');
+const goldTagEl = document.getElementById('gold-tag');
+const shopEl = document.getElementById('shop');
+const rerollBtn = document.getElementById('reroll-btn');
+const lockBtn = document.getElementById('lock-btn');
+const fxCanvas = document.getElementById('fx-canvas');
+const ctx = fxCanvas?.getContext('2d') || null;
 
 function getSynergyName(id) {
   const syn = synergies.find((s) => s.id === id);
@@ -252,6 +264,7 @@ function renderSynergySummary() {
 function renderHud() {
   hudRoundEl.textContent = `R${roundIndex + 1} / 10`;
   hudHeartEl.textContent = `❤️ ${hearts}`;
+  goldTagEl.textContent = `골드 ${gold}`;
 }
 
 function resetGame() {
@@ -260,12 +273,16 @@ function resetGame() {
   selectedBench = -1;
   roundIndex = 0;
   hearts = 3;
+  gold = 10;
   logEntries = [];
+  shopLocked = false;
+  rollShop();
   renderBench();
   renderBoards();
   renderSynergySummary();
   renderLog();
   renderHud();
+  renderShop();
 }
 
 function prepareTeam(teamUnits, bonus, side) {
@@ -323,6 +340,7 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
   const step = 0.35; // seconds
   const maxTime = 45; // seconds
   let t = 0;
+  const events = [];
 
   while (players.length && enemies.length && t < maxTime) {
     const all = [...players, ...enemies];
@@ -334,12 +352,14 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
         if (target) {
           const dmg = Math.max(8, u.stats.attack);
           target.hp -= dmg;
+          events.push({ type: 'attack', from: { x: u.x, y: u.y, side: u.side }, to: { x: target.x, y: target.y, side: target.side }, dmg });
           if (target.hp <= 0) {
             if (target.side === 'player') {
               players = players.filter((p) => p.uid !== target.uid);
             } else {
               enemies = enemies.filter((p) => p.uid !== target.uid);
             }
+            events.push({ type: 'death', at: { x: target.x, y: target.y } });
           }
         }
         const atkInterval = Math.max(0.3, 1 / Math.max(0.2, u.stats.attackSpeed));
@@ -361,8 +381,74 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits) {
     winner,
     players,
     enemies,
-    time: Number(t.toFixed(1))
+    time: Number(t.toFixed(1)),
+    events
   };
+}
+
+function rollShop() {
+  if (shopLocked && shop.length) return;
+  shop = [];
+  for (let i = 0; i < SHOP_SIZE; i++) {
+    const pick = units[Math.floor(Math.random() * units.length)];
+    shop.push({ slot: i, id: pick.id, star: 1, cost: pick.cost });
+  }
+  renderShop();
+}
+
+function buyFromShop(slot) {
+  const item = shop.find((s) => s.slot === slot);
+  if (!item) return;
+  if (gold < item.cost) {
+    alert('골드가 부족합니다.');
+    return;
+  }
+  if (bench.length >= BENCH_MAX) {
+    alert('벤치가 가득 찼어요.');
+    return;
+  }
+  gold -= item.cost;
+  bench.push({ uid: uid(), id: item.id, star: 1 });
+  shop = shop.filter((s) => s.slot !== slot);
+  renderShop();
+  renderBench();
+  renderHud();
+}
+
+function renderShop() {
+  shopEl.innerHTML = '';
+  shop.forEach((s) => {
+    const base = units.find((u) => u.id === s.id);
+    const card = document.createElement('div');
+    card.className = `shop-card ${shopLocked ? 'locked' : ''}`;
+    card.innerHTML = `
+      <h4>${base?.name || s.id}</h4>
+      <div class="muted">${(base?.traits || []).map(getSynergyName).join(', ')}</div>
+      <div class="muted">HP ${base?.stats.hp} · ATK ${base?.stats.attack}</div>
+      <div class="cost">${s.cost} 골드</div>
+      <button class="btn">구매</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => buyFromShop(s.slot));
+    shopEl.appendChild(card);
+  });
+}
+
+function gainIncome(win) {
+  const baseIncome = 5;
+  const winBonus = win ? 1 : 0;
+  const interest = Math.min(5, Math.floor(gold / 10));
+  gold += baseIncome + winBonus + interest;
+}
+
+function rerollShop() {
+  if (gold < REROLL_COST) {
+    alert('골드가 부족합니다.');
+    return;
+  }
+  gold -= REROLL_COST;
+  shopLocked = false;
+  rollShop();
+  renderHud();
 }
 
 function renderLog() {
@@ -397,7 +483,10 @@ function startRound() {
   isFighting = true;
   startBtn.disabled = true;
   const result = simulateBattle(playerUnits, enemyUnits);
+  fxEvents = result.events;
+  playFx();
   if (result.winner === 'enemy') hearts = Math.max(0, hearts - 1);
+  else gainIncome(true);
   logEntries.push({
     round: roundIndex + 1,
     name: aiComps[roundIndex]?.name || '',
@@ -411,6 +500,7 @@ function startRound() {
   renderHud();
   roundIndex = Math.min(9, roundIndex + 1);
   renderBoards();
+  if (!shopLocked) rollShop();
   isFighting = false;
   startBtn.disabled = false;
   if (hearts === 0) {
@@ -420,9 +510,54 @@ function startRound() {
 
 startBtn.addEventListener('click', startRound);
 resetBtn.addEventListener('click', resetGame);
+rerollBtn.addEventListener('click', rerollShop);
+lockBtn.addEventListener('click', () => { shopLocked = !shopLocked; lockBtn.textContent = shopLocked ? '고정 해제' : '고정'; renderShop(); });
+
+function cellCenter(x, y) {
+  const w = fxCanvas.width / BOARD_COLS;
+  const h = fxCanvas.height / BOARD_ROWS;
+  return { cx: w * x + w / 2, cy: h * y + h / 2 };
+}
+
+function playFx() {
+  if (!ctx || !fxEvents.length) return;
+  fxCanvas.width = fxCanvas.clientWidth;
+  fxCanvas.height = fxCanvas.clientHeight;
+  let i = 0;
+  const tick = () => {
+    ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+    const ev = fxEvents[i];
+    if (ev) {
+      if (ev.type === 'attack') {
+        const from = cellCenter(ev.from.x, ev.from.y);
+        const to = cellCenter(ev.to.x, ev.to.y);
+        ctx.strokeStyle = ev.from.side === 'player' ? '#22d3ee' : '#a855f7';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(from.cx, from.cy);
+        ctx.lineTo(to.cx, to.cy);
+        ctx.stroke();
+      } else if (ev.type === 'death') {
+        const { cx, cy } = cellCenter(ev.at.x, ev.at.y);
+        ctx.fillStyle = 'rgba(239,68,68,0.4)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    i++;
+    if (i < fxEvents.length) {
+      requestAnimationFrame(tick);
+    } else {
+      setTimeout(() => ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height), 200);
+    }
+  };
+  requestAnimationFrame(tick);
+}
 
 fetchConfig();
 renderHud();
 renderBoards();
 renderSynergySummary();
+rollShop();
 

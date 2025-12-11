@@ -39,6 +39,7 @@
             <div id="enemy-board" class="board-grid board-enemy"></div>
           </div>
         </div>
+        <canvas id="fx-canvas" class="fx-canvas"></canvas>
       </section>
 
       <section class="panel">
@@ -51,6 +52,18 @@
           <h3>시너지 (배치 기준)</h3>
           <div id="synergy-summary" class="synergy-grid"></div>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>상점</h2>
+          <div class="legend">
+            <span class="tag" id="gold-tag">골드 0</span>
+            <button id="reroll-btn" class="btn">리롤(-2)</button>
+            <button id="lock-btn" class="btn">고정</button>
+          </div>
+        </div>
+        <div id="shop" class="shop"></div>
       </section>
 
       <section class="panel">
