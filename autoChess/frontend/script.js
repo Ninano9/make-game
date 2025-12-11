@@ -88,6 +88,15 @@ const lockBtn = document.getElementById('lock-btn');
 const fxCanvas = document.getElementById('fx-canvas');
 const ctx = fxCanvas?.getContext('2d') || null;
 
+function hexToRgba(hex, alpha = 1) {
+  if (!hex || hex[0] !== '#') return hex;
+  const h = hex.replace('#', '');
+  const v = h.length === 3
+    ? h.split('').map((c) => parseInt(c + c, 16))
+    : [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  return `rgba(${v[0]},${v[1]},${v[2]},${alpha})`;
+}
+
 function getSynergyName(id) {
   const syn = synergies.find((s) => s.id === id);
   return syn ? syn.name : id;
@@ -492,6 +501,7 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
               .map((o) => ({ o, d: manhattan(u, o) }))
               .sort((a, b) => a.d - b.d);
             const targets = sorted.slice(0, Math.max(1, cfg.radius)).map((t) => t.o);
+            if (!targets.length) return;
             targets.forEach((st) => {
               let sdmg = Math.max(10, Math.round(u.stats.abilityPower * cfg.mult));
               if (cfg.type === 'heal') {
@@ -791,8 +801,8 @@ function playFx() {
 
       // 외곽 링
       const grad = ctx.createRadialGradient(midx, midy, radius * 0.2, midx, midy, radius);
-      grad.addColorStop(0, `${color}44`.replace('#',''));
-      grad.addColorStop(1, `${color}00`.replace('#',''));
+      grad.addColorStop(0, hexToRgba(color, 0.4));
+      grad.addColorStop(1, hexToRgba(color, 0.0));
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(midx, midy, radius, 0, Math.PI * 2);
@@ -812,7 +822,7 @@ function playFx() {
       ctx.fill();
 
       // 방향 트레이스
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = hexToRgba(color, 0.8);
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(from.cx, from.cy);
