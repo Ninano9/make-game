@@ -456,8 +456,8 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
   let players = prepareTeam(playerBoardUnits, playerBonus, 'player', 1);
   let enemies = prepareTeam(enemyBoardUnits, enemyBonus, 'enemy', enemyScale);
 
-  const step = 0.35; // seconds
-  const maxTime = 45; // seconds
+  const step = 0.23; // faster tick
+  const maxTime = 32; // faster cap
   let t = 0;
   const events = [];
 
@@ -743,7 +743,7 @@ function playFx() {
   fxCanvas.height = fxCanvas.clientHeight;
   let i = 0;
   let start = null;
-  const duration = 320;
+  const duration = 220;
 
   const drawUnits = () => {
     fxUnits.forEach((u) => {
@@ -786,20 +786,38 @@ function playFx() {
       const to = cellCenter(ev.to.x, ev.to.y);
       const midx = from.cx + (to.cx - from.cx) * progress;
       const midy = from.cy + (to.cy - from.cy) * progress;
-      const radius = 10 + 24 * progress;
+      const radius = 12 + 28 * progress;
       const color = ev.color || (ev.from.side === 'player' ? '#38bdf8' : '#c084fc');
+
+      // 외곽 링
+      const grad = ctx.createRadialGradient(midx, midy, radius * 0.2, midx, midy, radius);
+      grad.addColorStop(0, `${color}44`.replace('#',''));
+      grad.addColorStop(1, `${color}00`.replace('#',''));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(midx, midy, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 코어 펄스
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(midx, midy, radius, 0, Math.PI * 2);
+      ctx.arc(midx, midy, radius * 0.6, 0, Math.PI * 2);
       ctx.stroke();
-      // 간단 변환: hex 기반이면 플레이어/적 구분 색상 사용
-      ctx.fillStyle = ev.from.side === 'player'
-        ? 'rgba(56,189,248,0.25)'
-        : 'rgba(192,132,252,0.25)';
+      ctx.fillStyle = ev.spellType === 'heal'
+        ? 'rgba(52,211,153,0.35)'
+        : 'rgba(255,255,255,0.12)';
       ctx.beginPath();
-      ctx.arc(midx, midy, radius * 0.7, 0, Math.PI * 2);
+      ctx.arc(midx, midy, radius * 0.35, 0, Math.PI * 2);
       ctx.fill();
+
+      // 방향 트레이스
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(from.cx, from.cy);
+      ctx.lineTo(midx, midy);
+      ctx.stroke();
     } else if (ev.type === 'death') {
       const { cx, cy } = cellCenter(ev.at.x, ev.at.y);
       const r = 6 + 18 * progress;
