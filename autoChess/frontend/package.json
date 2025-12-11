@@ -1,0 +1,13 @@
+{
+  "name": "auto-chess-frontend",
+  "version": "0.1.0",
+  "description": "AutoChess 10라운드 PvE 프론트엔드 (Render 정적 배포용)",
+  "scripts": {
+    "build": "mkdir -p dist && cp index.html dist/ && cp style.css dist/ && cp script.js dist/",
+    "start": "npx serve -s dist -l ${PORT:-3000}"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
+
