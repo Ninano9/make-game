@@ -399,7 +399,7 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
   const playerBonus = computeSynergyBonus(playerBoardUnits).bonus;
   const enemyBonus = computeSynergyBonus(enemyBoardUnits).bonus;
 
-  const enemyScale = 1 + roundIdx * 0.12; // 라운드가 갈수록 강해짐
+  const enemyScale = 0.9 + roundIdx * 0.08; // 완화된 난이도 스케일
   let players = prepareTeam(playerBoardUnits, playerBonus, 'player', 1);
   let enemies = prepareTeam(enemyBoardUnits, enemyBonus, 'enemy', enemyScale);
 
@@ -487,12 +487,43 @@ function simulateBattle(playerBoardUnits, enemyBoardUnits, roundIdx) {
   };
 }
 
+function getShopWeight(cost, r) {
+  if (r <= 1) { // Round 1~2 (idx 0~1): 1코 70, 2코 30
+    return cost === 1 ? 70 : cost === 2 ? 30 : 0;
+  }
+  if (r <= 3) { // Round 3~4: 1코 45, 2코 40, 3코 15
+    return cost === 1 ? 45 : cost === 2 ? 40 : cost === 3 ? 15 : 0;
+  }
+  if (r <= 6) { // Round 5~7: 1코 25, 2코 35, 3코 25, 4코 15
+    return cost === 1 ? 25 : cost === 2 ? 35 : cost === 3 ? 25 : cost === 4 ? 15 : 0;
+  }
+  // Round 8~10: 1코 10, 2코 25, 3코 30, 4코 25, 5코 10
+  return cost === 1 ? 10 : cost === 2 ? 25 : cost === 3 ? 30 : cost === 4 ? 25 : cost === 5 ? 10 : 0;
+}
+
+function pickWeightedUnit(r) {
+  let total = 0;
+  const acc = [];
+  units.forEach((u) => {
+    const w = getShopWeight(u.cost, r);
+    if (w > 0) {
+      total += w;
+      acc.push({ id: u.id, w: total });
+    }
+  });
+  if (total === 0) return units[Math.floor(Math.random() * units.length)].id;
+  const roll = Math.random() * total;
+  const found = acc.find((a) => roll <= a.w);
+  return found ? found.id : acc[acc.length - 1].id;
+}
+
 function rollShop() {
   if (shopLocked && shop.length) return;
   if (!units.length) return;
   shop = [];
   for (let i = 0; i < SHOP_SIZE; i++) {
-    const pick = units[Math.floor(Math.random() * units.length)];
+    const pickId = pickWeightedUnit(roundIndex);
+    const pick = units.find((u) => u.id === pickId);
     shop.push({ slot: i, id: pick.id, star: 1, cost: pick.cost });
   }
   renderShop();
